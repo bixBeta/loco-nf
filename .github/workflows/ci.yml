@@ -255,6 +255,19 @@ jobs:
             || fail "init was given a staged reference rather than its real path"
           echo "table generation OK"
 
+          # versions.yml comes out of a heredoc in the middle of the script. If
+          # its terminator ever stops matching, the heredoc swallows the rest of
+          # the script and the failure is reported as something unrelated, so
+          # check the artefact itself.
+          python -c "
+          import sys, yaml
+          d = yaml.safe_load(open('pipeline_info/versions.yml'))
+          assert isinstance(d, dict) and d, f'versions.yml is not a mapping: {d!r}'
+          key = next(iter(d))
+          assert 'snakemake' in d[key], f'no snakemake version recorded: {d!r}'
+          print('versions.yml OK:', d)
+          "
+
       # A relative bam path validates fine at launch but would be unusable from
       # a task working directory, so it has to be absolute in samples.tsv.
       - name: Relative bam paths are made absolute

@@ -92,12 +92,15 @@ CONTIGS_TSV
     # the image entirely. Edits workflow/config.yaml, which is now beside us.
     loco-pipe-local
 
-    cat <<-END_VERSIONS > "\$task_dir/versions.yml"
-    "${task.process}":
-        loco-pipe: \$(loco-pipe --help > /dev/null 2>&1 && echo "0.1")
-        snakemake: \$(snakemake --version)
-        angsd: \$(angsd 2>&1 | grep -m1 -oE 'version: [^ ]+' | sed 's/version: //')
-    END_VERSIONS
+    # terminator at column 0, like the two above. <<- strips leading TABS only,
+    # so an indented terminator never matches and the heredoc swallows the rest
+    # of the script.
+    cat > "\$task_dir/versions.yml" <<END_VERSIONS
+"${task.process}":
+    loco-pipe: \$(loco-pipe --help > /dev/null 2>&1 && echo "0.1")
+    snakemake: \$(snakemake --version)
+    angsd: \$(angsd 2>&1 | grep -m1 -oE 'version: [^ ]+' | sed 's/version: //')
+END_VERSIONS
 
     if [ "${params.launch}" != "true" ] ; then
         echo "prepared ${outdir} but did not launch it ( --launch false )"
