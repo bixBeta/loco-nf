@@ -493,11 +493,19 @@ jobs:
         run: |
           set -euo pipefail
           FIX=$PWD/fixture
+          # substitute exactly what nextflow substitutes: the ${...} references
+          # and the \$ escapes. Line continuations must survive untouched - an
+          # earlier version of this stripped them and hid a real bug.
           sed -e "s|\${projectDir}|$PWD|g" \
               -e "s|\${outdir}|$FIX|g" \
               -e "s|\${id}|CI_TEST|g" \
-              modules/report/templates/makeReport.sh | sed 's|\\\$|$|g' > /tmp/render.sh
+              -e 's|\\\$|$|g' \
+              modules/report/templates/makeReport.sh > /tmp/render.sh
           bash -n /tmp/render.sh
+          # no stray backslash may survive as an argument
+          if grep -qE '(^|[^\\])\\\\$' /tmp/render.sh ; then
+            echo "doubled line continuation in makeReport.sh"; exit 1
+          fi
           mkdir -p /tmp/render && cd /tmp/render
           bash /tmp/render.sh
           test -f CI_TEST-loco-report.html || { echo "no report produced"; exit 1; }

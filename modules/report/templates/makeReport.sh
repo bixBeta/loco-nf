@@ -26,9 +26,9 @@ find figures -name '*.pdf' | while read -r p ; do
     convert -density 150 "\$p" "\${p%.pdf}.png" 2>/dev/null || true
 done
 
-quarto render loco-report.qmd \\
-    -P title:${id} \\
-    -P outdir:${outdir} \\
+quarto render loco-report.qmd \
+    -P title:${id} \
+    -P outdir:${outdir} \
     -o ${id}-loco-report.html
 
 rm -f *.qmd
