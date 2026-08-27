@@ -337,21 +337,27 @@ jobs:
       # snakemake writes a source cache under $HOME/.cache and dies at DAG
       # construction if $HOME is read-only, which it is inside a container on
       # many clusters. The run must not depend on a writable home.
-      - name: A read-only HOME does not break the run
+      # The launcher itself needs a writable $HOME, so this cannot be tested by
+      # making HOME read-only - that breaks nextflow before the task runs, which
+      # is not the situation on a cluster ( there the launcher is on the host and
+      # only the container sees a read-only home ). Instead, hand the run an
+      # unusable XDG_CACHE_HOME: the task must override it with a task-local one,
+      # and the fake asserts the one it receives is actually writable.
+      - name: An unwritable cache directory is overridden
         run: |
           set -euo pipefail
           rm -rf locopipe
-          mkdir -p "$RUNNER_TEMP/rohome"
-          chmod 555 "$RUNNER_TEMP/rohome"
+          mkdir -p "$RUNNER_TEMP/rocache"
+          chmod 555 "$RUNNER_TEMP/rocache"
           set +e
-          out=$(HOME="$RUNNER_TEMP/rohome" nextflow run . -c test/ci.config \
+          out=$(XDG_CACHE_HOME="$RUNNER_TEMP/rocache" nextflow run . -c test/ci.config \
                   --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa" \
                   --locopipebin "$PWD/test/bin/loco-pipe" --threads 2 2>&1)
           rc=$?
           set -e
-          chmod 755 "$RUNNER_TEMP/rohome"
+          chmod 755 "$RUNNER_TEMP/rocache"
           if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
-          echo "read-only HOME OK"
+          echo "cache directory override OK"
 
       # loco-pipe start exits 0 even when snakemake did nothing at all, so a
       # clean exit with no results has to be treated as a failure.

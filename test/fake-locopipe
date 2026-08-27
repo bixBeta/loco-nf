@@ -98,6 +98,16 @@ YAML
 
         [ -n "$THREADS" ] || { echo "fake-locopipe: start was not told -@ <threads>" >&2 ; exit 1 ; }
 
+        # Real snakemake writes a source cache here and dies at DAG construction
+        # if it is not writable, which is what a read-only $HOME inside a
+        # container causes. Assert the caller gave us a usable one.
+        [ -n "${XDG_CACHE_HOME:-}" ] || {
+            echo "fake-locopipe: XDG_CACHE_HOME is not set; snakemake would fall back to \$HOME/.cache" >&2
+            exit 1 ; }
+        mkdir -p "$XDG_CACHE_HOME" 2>/dev/null && touch "$XDG_CACHE_HOME/.probe" 2>/dev/null || {
+            echo "fake-locopipe: XDG_CACHE_HOME ($XDG_CACHE_HOME) is not writable" >&2
+            exit 1 ; }
+
         # what real loco-pipe reads; a front-end that wrote them wrong fails here
         [ -f "${DIR}/docs/samples.tsv" ] || { echo "fake-locopipe: no ${DIR}/docs/samples.tsv" >&2 ; exit 1 ; }
         [ -f "${DIR}/docs/contigs.tsv" ] || { echo "fake-locopipe: no ${DIR}/docs/contigs.tsv" >&2 ; exit 1 ; }
