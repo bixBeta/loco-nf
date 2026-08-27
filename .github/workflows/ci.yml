@@ -113,7 +113,11 @@ jobs:
         run: |
           set -euo pipefail
           # --help and first-time runs have no sheet; the bind logic must not throw
-          nextflow run . --help --sheet /no/such/sheet.csv > /dev/null
+          set +e
+          out=$(nextflow run . --help --sheet /no/such/sheet.csv 2>&1)
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
           nextflow config . > /dev/null
           echo "config parses without a sheet"
 
