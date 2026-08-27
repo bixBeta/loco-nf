@@ -41,6 +41,23 @@ jobs:
       - name: Generate test data
         run: bash test/make_test_data.sh
 
+      # First, and on its own, because everything below runs `nextflow config`
+      # and a config that does not parse makes them all fail with whatever they
+      # happened to be grepping for rather than the actual error.
+      - name: Config parses
+        run: |
+          set -euo pipefail
+          set +e
+          out=$(nextflow config . 2>&1)
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] ; then
+            echo "nextflow.config failed to parse:"
+            echo "$out" | tail -20
+            exit 1
+          fi
+          echo "config parses"
+
       - name: params.yaml is in step with the defaults
         run: |
           pip install --quiet pyyaml
