@@ -102,17 +102,23 @@ process LOCOPIPE_RUN {
     """
     ${onPath}
 
+    # The project arrives as a symlink, so `cd` into it lands in the real
+    # directory and `..` would resolve to ITS parent, not the task dir. Every
+    # path out of the project has to be absolute.
+    task_dir=\$PWD
+    log=\$task_dir/locopipe.log
+
     cd ${project}
 
     # -@ matches what Nextflow reserved, so snakemake cannot oversubscribe the
     # allocation it was given
-    loco-pipe start -@ ${task.cpus} . 2>&1 | tee ../locopipe.log
+    loco-pipe start -@ ${task.cpus} . 2>&1 | tee "\$log"
 
     # `loco-pipe start` calls subprocess.run without checking the return code,
     # so it exits 0 even when the workflow failed. Its log is the only reliable
     # signal, and without this a failed run looks like a successful one.
-    cd ..
-    if grep -qE 'WorkflowError|command exited with non-zero' locopipe.log ; then
+    cd "\$task_dir"
+    if grep -qE 'WorkflowError|command exited with non-zero' "\$log" ; then
         echo "loco-pipe reported a failure, see locopipe.log" >&2
         exit 1
     fi
