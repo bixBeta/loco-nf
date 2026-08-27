@@ -78,7 +78,9 @@ From: condaforge/miniforge3@sha256:609d8012d8ad3ea46c8e531ce2de9e727031960067b3a
     # rather than the one r-essentials drags in; ohana last since nothing else
     # provides `convert` or `qpas`.
     export PATH=/opt/conda/envs/locopipe/bin:/opt/conda/envs/r/bin:/opt/conda/envs/angsd/bin:/opt/conda/envs/pcangsd/bin:/opt/conda/envs/ohana/bin:/opt/conda/bin:/usr/local/bin:/usr/bin:/bin
-    # Keep R and Snakemake from writing into the read-only image.
+    # Keep R and Snakemake from writing into the read-only image, or into a
+    # $HOME that is frequently read-only inside a container on a cluster.
+    export XDG_CACHE_HOME=/tmp/.cache
     export R_LIBS_USER=/tmp/R-libs
     export LC_ALL=C.UTF-8
     export LANG=C.UTF-8

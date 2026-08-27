@@ -118,6 +118,14 @@ YAML
             cp "${DIR}/docs/contigs.tsv"            "${CI_CAPTURE}/contigs.tsv"
         fi
 
+        # snakemake can exit 0 having done nothing, e.g. an empty DAG. The
+        # front-end has to treat that as a failure rather than report success
+        # with no results.
+        if [ "${FAKE_EMPTY:-0}" = "1" ] ; then
+            echo "Nothing to be done (all requested files are present and up to date)."
+            exit 0
+        fi
+
         mkdir -p "${DIR}/figures"
 
         # the upstream quirk: a failed workflow still exits 0

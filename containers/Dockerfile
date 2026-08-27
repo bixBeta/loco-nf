@@ -64,7 +64,11 @@ RUN "$CONDA_DIR/envs/locopipe/bin/pip" install --no-cache-dir --no-deps /opt/loc
 ENV PATH=/opt/conda/envs/locopipe/bin:/opt/conda/envs/r/bin:/opt/conda/envs/angsd/bin:/opt/conda/envs/pcangsd/bin:/opt/conda/envs/ohana/bin:/opt/conda/bin:/usr/local/bin:/usr/bin:/bin
 
 # Keep R and Snakemake from writing into a read-only image or a stray $HOME.
-ENV R_LIBS_USER=/tmp/R-libs \
+# $HOME is often read-only inside a container on a cluster, and snakemake
+# writes a source cache under $XDG_CACHE_HOME ( default $HOME/.cache ), failing
+# at DAG construction before any rule runs.
+ENV XDG_CACHE_HOME=/tmp/.cache \
+    R_LIBS_USER=/tmp/R-libs \
     LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
     PYTHONDONTWRITEBYTECODE=1

@@ -334,6 +334,37 @@ jobs:
             && { echo "a failed loco-pipe run was reported as success"; exit 1; }
           echo "failure detection OK"
 
+      # snakemake writes a source cache under $HOME/.cache and dies at DAG
+      # construction if $HOME is read-only, which it is inside a container on
+      # many clusters. The run must not depend on a writable home.
+      - name: A read-only HOME does not break the run
+        run: |
+          set -euo pipefail
+          rm -rf locopipe
+          mkdir -p "$RUNNER_TEMP/rohome"
+          chmod 555 "$RUNNER_TEMP/rohome"
+          set +e
+          out=$(HOME="$RUNNER_TEMP/rohome" nextflow run . -c test/ci.config \
+                  --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa" \
+                  --locopipebin "$PWD/test/bin/loco-pipe" --threads 2 2>&1)
+          rc=$?
+          set -e
+          chmod 755 "$RUNNER_TEMP/rohome"
+          if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
+          echo "read-only HOME OK"
+
+      # loco-pipe start exits 0 even when snakemake did nothing at all, so a
+      # clean exit with no results has to be treated as a failure.
+      - name: A run that produces nothing is not reported as success
+        run: |
+          set -euo pipefail
+          rm -rf locopipe
+          export FAKE_EMPTY=1
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" --threads 2 \
+            && { echo "a run that produced nothing was reported as success"; exit 1; }
+          echo "empty run detection OK"
+
       - name: Stub run
         run: |
           nextflow run . -stub-run -c test/ci.config \
