@@ -354,6 +354,21 @@ jobs:
 
       # snakemake keeps its state in --outdir, which is the point of putting it
       # outside work/: a second run continues rather than starting over.
+      # Apptainer refuses to start when a bind source does not exist, and the
+      # results directory is bound. CI has no containers, so it cannot reproduce
+      # that failure - it can at least assert the workflow creates the directory
+      # itself rather than leaving it to the task.
+      - name: The results directory is created before the task runs
+        run: |
+          set -euo pipefail
+          rm -rf fresh_outdir
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir fresh_outdir --threads 2 --launch false
+          test -d fresh_outdir || { echo "outdir was not created"; exit 1; }
+          rm -rf fresh_outdir
+          echo "outdir creation OK"
+
       - name: A prepared outdir is reused on the next run
         run: |
           set -euo pipefail

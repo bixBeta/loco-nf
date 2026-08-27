@@ -323,6 +323,14 @@ workflow RUN {
     // records absolute paths into locopipe.yaml.
     def outdir = file(params.outdir).toAbsolutePath().normalize().toString()
 
+    // Created here, on the host, before anything is scheduled. The results
+    // directory is bind mounted into the image, and Apptainer treats a bind
+    // source that does not exist as fatal:
+    //   FATAL: container creation failed: ... mount source ... doesn't exist
+    // The mkdir inside the task cannot help, since the container has to start
+    // before it can run.
+    if( !workflow.stubRun ) file(outdir).mkdirs()
+
     LOCOPIPE( ch_pin, ch_samples, ch_contigs, ch_bams, channel.value(refpath),
               channel.value(outdir), file(params.ref), file("${params.ref}.fai") )
 
