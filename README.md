@@ -1,26 +1,20 @@
 loco-pipe: a Snakemake pipeline for low-coverage whole-genome sequencing
 ================
 
-- <a href="#running-this-fork" id="toc-running-this-fork">Running this
-  fork</a>
-- <a href="#key-features" id="toc-key-features">Key features</a>
-- <a href="#currently-supported-functionalities"
-  id="toc-currently-supported-functionalities">Currently supported
-  functionalities</a>
-- <a href="#complete-pipeline-flowchart"
-  id="toc-complete-pipeline-flowchart">Complete pipeline flowchart</a>
-- <a href="#before-you-start" id="toc-before-you-start">Before you
-  start</a>
-- <a href="#setting-up-the-pipeline"
-  id="toc-setting-up-the-pipeline">Setting up the pipeline</a>
-- <a href="#preparing-the-project-directory-and-required-input-files"
-  id="toc-preparing-the-project-directory-and-required-input-files">Preparing
-  the project directory and required input files</a>
-- <a href="#launching-the-pipeline"
-  id="toc-launching-the-pipeline">Launching the pipeline</a>
-- <a href="#future-directions" id="toc-future-directions">Future
-  directions</a>
-- <a href="#citation" id="toc-citation">Citation</a>
+- <a href="#running-this-fork" id="toc-running-this-fork">Running this fork</a>
+  - <a href="#the-image" id="toc-the-image">The image</a>
+  - <a href="#the-nextflow-front-end" id="toc-the-nextflow-front-end">The Nextflow front-end</a>
+  - <a href="#one-caveat" id="toc-one-caveat">One caveat</a>
+- <a href="#original-loco-pipe-readme" id="toc-original-loco-pipe-readme">Original loco-pipe README</a>
+  - <a href="#key-features" id="toc-key-features">Key features</a>
+  - <a href="#currently-supported-functionalities" id="toc-currently-supported-functionalities">Currently supported functionalities</a>
+  - <a href="#complete-pipeline-flowchart" id="toc-complete-pipeline-flowchart">Complete pipeline flowchart</a>
+  - <a href="#before-you-start" id="toc-before-you-start">Before you start</a>
+  - <a href="#setting-up-the-pipeline" id="toc-setting-up-the-pipeline">Setting up the pipeline</a>
+  - <a href="#preparing-the-project-directory-and-required-input-files" id="toc-preparing-the-project-directory-and-required-input-files">Preparing the project directory and required input files</a>
+  - <a href="#launching-the-pipeline" id="toc-launching-the-pipeline">Launching the pipeline</a>
+  - <a href="#future-directions" id="toc-future-directions">Future directions</a>
+  - <a href="#citation" id="toc-citation">Citation</a>
 
 > ### Credit
 >
@@ -94,11 +88,20 @@ sample sheet in full.
 log and fails properly, but if you run loco-pipe directly inside the image,
 check the log rather than the exit status.
 
+## Original loco-pipe README
+
+Everything below is the documentation from
+[sudmantlab/loco-pipe](https://github.com/sudmantlab/loco-pipe), kept as it is
+because the workflow it describes is unchanged here. Where it says to install
+conda environments or run `snakemake` directly, the image and the front-end
+above do that for you; everything it says about the analyses themselves still
+applies exactly.
+
 **loco-pipe** is an automated Snakemake pipeline that streamlines a set
 of essential population genomic analyses for **lo**w-**co**verage whole
 genome sequencing (lcWGS) data.
 
-### Get Started
+#### Get Started
 1. Locally install the python package
 ```bash
 pixi shell
@@ -119,7 +122,7 @@ loco-pipe start toytest
 
 Use `--help` to see the command docstrings.
 
-## Key features
+### Key features
 
 - Streamlining of several essential population genomic analyses
 - Can be launched with a single line of code
@@ -140,7 +143,7 @@ Use `--help` to see the command docstrings.
     interrupted job
   - Built-in software management system and robust file structure
 
-## Currently supported functionalities
+### Currently supported functionalities
 
 - Depth counting
 - SNP calling
@@ -162,7 +165,7 @@ dataset. Please see our [quick start
 guide](https://github.com/sudmantlab/loco-pipe/blob/main/toyfish.md) for
 detailed descriptions of the plots.
 
-## Complete pipeline flowchart
+### Complete pipeline flowchart
 
 ![](guides/complete_flowchart.png) Each box represents a Snakemake rule and is
 colored based on the major groups of analyses in the form of separate
@@ -175,9 +178,9 @@ points of the pipeline, and the “all” box at the bottom is the end
 point. Please see our [user’s manual](manual/README.md) for detailed
 descriptions of each Snakemake rule.
 
-## Before you start
+### Before you start
 
-#### Reference genome
+##### Reference genome
 
 This pipeline requires a moderately contiguous reference genome for your
 study system. Currently, it does not support highly fragmented reference
@@ -189,7 +192,7 @@ of the genome should be consisted of no more than 100 scaffolds
 the analysis (we will ask you to provide a list of scaffolds that you
 would like to include).
 
-#### Sequence alignment files
+##### Sequence alignment files
 
 In addition, we assume that properly mapped and filtered bam files are
 ready to be used as input files for loco-pipe. You can choose your
@@ -197,7 +200,7 @@ favorite software and/or pipeline to go from fastq to bam, but one
 pipeline that we particularly recommend is
 [grenepipe](https://github.com/moiexpositoalonsolab/grenepipe).
 
-#### grenepipe
+##### grenepipe
 
 grenepipe is a Snakemake pipeline for variant calling from raw sequence
 data. Although it is developed for high-coverage data, you can skip the
@@ -214,7 +217,7 @@ documented](https://github.com/moiexpositoalonsolab/grenepipe/wiki), and
 it is a major inspiration for loco-pipe. Familiarizing yourself with
 grenepipe will also make loco-pipe much easier to learn.
 
-#### Quick start guide with an example dataset
+##### Quick start guide with an example dataset
 
 If you don’t yet have your data ready for loco-pipe, and even if you do,
 we highly recommend you to first follow our [quick start
@@ -223,7 +226,7 @@ which includes a heavily subsetted example dataset. It only takes
 loco-pipe a few minutes to analyse the example dataset on a computer
 cluster, making it much easier to learn and troubleshoot.
 
-#### User’s manual
+##### User’s manual
 
 We also provide an extensive [user’s manual](manual/README.md) with
 detailed description of each step of the pipeline for easy reference.
@@ -237,7 +240,7 @@ understanding of loco-pipe, the software it uses, and lcWGS data
 analysis in general while you are using loco-pipe. **Using this pipeline
 as a black box can lead to spurious results and erroneous conclusions.**
 
-## Setting up the pipeline
+### Setting up the pipeline
 
 1.  Install
     [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html)
@@ -290,7 +293,7 @@ as a black box can lead to spurious results and erroneous conclusions.**
                          devtools::install_github("petrelharp/local_pca/lostruct"))
     ```
 
-## Preparing the project directory and required input files
+### Preparing the project directory and required input files
 
 1.  Set up the file structure.
 
@@ -423,7 +426,7 @@ as a black box can lead to spurious results and erroneous conclusions.**
       manual](https://snakemake.readthedocs.io/en/stable/executing/cli.html#profiles)
       for details).
 
-## Launching the pipeline
+### Launching the pipeline
 
 1.  Activate the `loco-pipe` environment with
     `conda activate loco-pipe`.
@@ -446,7 +449,7 @@ as a black box can lead to spurious results and erroneous conclusions.**
     may be useful are `--conda-prefix`, `--default-resources`,
     `--printshellcmds`, `--cores`, etc.
 
-## Future directions
+### Future directions
 
 We plan to continue to maintain and develop loco-pipe, by incorporating
 additional analyses (e.g. GWAS, dxy, LD estimation and pruning) into
@@ -471,7 +474,7 @@ page. We also encourage users to build on the existing infrastructure
 and add more functionalities to loco-pipe in the form of [pull
 requests](https://github.com/sudmantlab/loco-pipe/pulls).
 
-## Citation
+### Citation
 
 loco-pipe is published in Bioinformatics Advances:
 <https://doi.org/10.1093/bioadv/vbae098> Please cite this paper if you

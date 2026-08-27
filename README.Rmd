@@ -3,7 +3,7 @@ title: "loco-pipe: a Snakemake pipeline for low-coverage whole-genome sequencing
 output:
     github_document:
         toc: true
-        toc_depth: 2
+        toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -62,9 +62,18 @@ nextflow run bixBeta/loco-nf -r main -params-file params.yaml
 
 `loco-pipe start` calls `subprocess.run` without checking the return code, so **it exits 0 even when the workflow failed**. The Nextflow front-end greps the log and fails properly, but if you run loco-pipe directly inside the image, check the log rather than the exit status.
 
+## Original loco-pipe README
+
+Everything below is the documentation from
+[sudmantlab/loco-pipe](https://github.com/sudmantlab/loco-pipe), kept as it is
+because the workflow it describes is unchanged here. Where it says to install
+conda environments or run `snakemake` directly, the image and the front-end
+above do that for you; everything it says about the analyses themselves still
+applies exactly.
+
 **loco-pipe** is an automated Snakemake pipeline that streamlines a set of essential population genomic analyses for **lo**w-**co**verage whole genome sequencing (lcWGS) data.
 
-## Key features
+### Key features
 
 * Streamlining of several essential population genomic analyses
 * Can be launched with a single line of code
@@ -80,7 +89,7 @@ nextflow run bixBeta/loco-nf -r main -params-file params.yaml
     * The ability to automatically continue from the last failed or interrupted job
     * Built-in software management system and robust file structure
 
-## Currently supported functionalities
+### Currently supported functionalities
 
 * Depth counting
 * SNP calling
@@ -97,36 +106,36 @@ nextflow run bixBeta/loco-nf -r main -params-file params.yaml
 ![](guides/simplified_flowchart.png)
 A simplified flowchart of loco-pipe highlighting its key functionalities. The box in dotted lines represents user-provided input files, and boxes in solid lines represent key analytical steps in the pipeline. Plots are generated using our example dataset. Please see our [quick start guide](https://github.com/sudmantlab/loco-pipe/blob/main/toyfish.md) for detailed descriptions of the plots.
 
-## Complete pipeline flowchart
+### Complete pipeline flowchart
 
 ![](guides/complete_flowchart.png)
 Each box represents a Snakemake rule and is colored based on the major groups of analyses in the form of separate Snakefiles (shown at the top left corner). The differently colored shades indicate the types of SNPs or sites on which the analyses are conducted. Dashed arrows indicate key modules that can be turned on or off in the configuration file. The four orange boxes at the top right corner (part of the “pipeline_prep.smk” Snakefile) are the starting points of the pipeline, and the “all” box at the bottom is the end point. Please see our [user's manual](manual/README.md) for detailed descriptions of each Snakemake rule.
 
-## Before you start
+### Before you start
 
-#### Reference genome
+##### Reference genome
 
 This pipeline requires a moderately contiguous reference genome for your study system. Currently, it does not support highly fragmented reference genomes, since most analyses are parallelized by scaffolds. Having too many scaffolds or unscaffolded contigs will create too many parallel jobs for Snakemake and a job scheduler to handle. We recommend that 90% of the genome should be consisted of no more than 100 scaffolds (i.e. L90 < 100). Small scaffolds and contigs should be excluded from the analysis (we will ask you to provide a list of scaffolds that you would like to include).
 
-#### Sequence alignment files
+##### Sequence alignment files
 
 In addition, we assume that properly mapped and filtered bam files are ready to be used as input files for loco-pipe. You can choose your favorite software and/or pipeline to go from fastq to bam, but one pipeline that we particularly recommend is [grenepipe](https://github.com/moiexpositoalonsolab/grenepipe). 
 
-#### grenepipe
+##### grenepipe
 
 grenepipe is a Snakemake pipeline for variant calling from raw sequence data. Although it is developed for high-coverage data, you can skip the variant calling step by using the `all_qc` [shortcut](https://github.com/moiexpositoalonsolab/grenepipe/wiki/Advanced-Usage#running-only-parts-of-the-pipeline) and turning the `bcftools-stats` switch in the config file to `false`. This way, grenepipe will stop after generating the final bam files and their associated quality reports. (We also recommend turning the `clip-read-overlaps` switch to `true` and setting `VALIDATION_STRINGENCY=SILENT` for `picard MarkDuplicates` in the configuration file.) grenepipe is very thoughtfully built and [extensively documented](https://github.com/moiexpositoalonsolab/grenepipe/wiki), and it is a major inspiration for loco-pipe. Familiarizing yourself with grenepipe will also make loco-pipe much easier to learn.
 
-#### Quick start guide with an example dataset
+##### Quick start guide with an example dataset
 
 If you don't yet have your data ready for loco-pipe, and even if you do, we highly recommend you to first follow our [quick start guide](https://github.com/sudmantlab/loco-pipe/blob/main/toyfish.md) which includes a heavily subsetted example dataset. It only takes loco-pipe a few minutes to analyse the example dataset on a computer cluster, making it much easier to learn and troubleshoot.
 
-#### User's manual
+##### User's manual
 
 We also provide an extensive [user's manual](manual/README.md) with detailed description of each step of the pipeline for easy reference. Tips and suggestions are also included in this document. 
 
 We **strongly** advise users to take advantage of these resources (as well as other resources such as the [ANGSD manual](https://www.popgen.dk/angsd/index.php/ANGSD) and our [beginner's guide to lcWGS](https://doi.org/10.1111/mec.16077)) to gain a good understanding of loco-pipe, the software it uses, and lcWGS data analysis in general while you are using loco-pipe. **Using this pipeline as a black box can lead to spurious results and erroneous conclusions.**
 
-## Setting up the pipeline
+### Setting up the pipeline
 
 1. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) or [conda](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html) if you have not already done so. Note that `mamba v2` has some compatibility issues with Snakemake, and the speed of `conda` has improved significantly in recent updates, so `mamba` is no longer recommended over `conda`. If you choose to use `mamba`, make sure to use a v1 version, and replace all occurrences of `conda` with `mamba` in the code below.
 
@@ -158,7 +167,7 @@ We **strongly** advise users to take advantage of these resources (as well as ot
                          devtools::install_github("petrelharp/local_pca/lostruct"))
     ```
 
-## Preparing the project directory and required input files
+### Preparing the project directory and required input files
 
 1. Set up the file structure. 
 
@@ -200,7 +209,7 @@ We **strongly** advise users to take advantage of these resources (as well as ot
     
     * (Optional) The [cluster config file](https://github.com/sudmantlab/loco-pipe/blob/main/workflow/profiles/slurm/cluster_config.yaml) `cluster_config.yaml` under `workflow/profiles`: This config files specifies the resources each step of the pipeline can use on a computer cluster. We have extensively tested loco-pipe with a slurm job scheduler and an example slurm profile is included in loco-pipe (`workflow/profiles/slurm`), but other job schedulers should also work with Snakemake given an appropriate profile setup (see [Snakemake manual](https://snakemake.readthedocs.io/en/stable/executing/cli.html#profiles) for details).
 
-## Launching the pipeline
+### Launching the pipeline
 
 1. Activate the `loco-pipe` environment with `conda activate loco-pipe`.
 
@@ -218,7 +227,7 @@ We **strongly** advise users to take advantage of these resources (as well as ot
     
     When running loco-pipe on a computer cluster, make sure to use the `--profile` flag to specify your cluster profile. Other flags that may be useful are `--conda-prefix`, `--default-resources`, `--printshellcmds`, `--cores`, etc.
 
-## Future directions
+### Future directions
 
 We plan to continue to maintain and develop loco-pipe, by incorporating additional analyses (e.g. GWAS, dxy, LD estimation and pruning) into this pipeline and also enabling more functionalities for the existing software programs (e.g. ANGSD, Ohana). For certain existing analyses, we also hope to provide more software options for users to pick from (e.g. [winSFS](https://academic.oup.com/genetics/article/222/4/iyac148/6730749?login=false) for SFS estimation, [ngsAdmix](https://academic.oup.com/genetics/article/195/3/693/5935455) for admixture analysis). Advanced SNP filtering procedures, such as the one described in 
 [Dallaire et al. (2023)](https://academic.oup.com/gbe/article/15/12/evad229/7470724), can be incorporated into loco-pipe manually (see [User's Manual](manual/README.md) for instructions), but may be fully automated in the future. In choosing depth filters, we may adopt a mixed model instead of a truncated normal distribution for curve fitting in the future. Docker/singularity support will also be considered.
@@ -226,6 +235,6 @@ We plan to continue to maintain and develop loco-pipe, by incorporating addition
 All kinds of feedback, such as bug reports and feature requests, are welcome on the [Issues](https://github.com/sudmantlab/loco-pipe/issues) page. We also encourage users to build on the existing infrastructure and add more functionalities to loco-pipe in the form of [pull requests](https://github.com/sudmantlab/loco-pipe/pulls).
 
 
-## Citation
+### Citation
 
 loco-pipe is published in Bioinformatics Advances: https://doi.org/10.1093/bioadv/vbae098 Please cite this paper if you use loco-pipe in your research.
