@@ -82,9 +82,13 @@ jobs:
             echo "$cfg" | grep -i container; echo "sif path not resolved"; exit 1; }
           # The analysis image must be local. The report image is deliberately a
           # registry reference: quarto lives in the sartools image, not in
-          # loco-pipe.sif. Anything else pointing at a registry is a mistake.
-          if echo "$cfg" | grep -E 'docker://|ghcr.io|quay.io' | grep -vE 'qmdimage|qmds' | grep -q . ; then
-            echo "$cfg" | grep -E 'docker://|ghcr.io|quay.io'
+          # loco-pipe.sif. So every container directive EXCEPT that one must be
+          # local, compared against the resolved value rather than a block name.
+          qmd=$(echo "$cfg" | sed -n "s/^ *qmdimage *= *'\(.*\)'.*/\1/p" | head -1)
+          [ -n "$qmd" ] || { echo "qmdimage not resolved"; exit 1; }
+          if echo "$cfg" | grep -E "^\s*container = " | grep -vF "$qmd" \
+               | grep -qE 'docker://|ghcr.io|quay.io' ; then
+            echo "$cfg" | grep -E "^\s*container = "
             echo "an analysis container references a registry"; exit 1
           fi
           echo "sif resolution OK"
@@ -437,6 +441,10 @@ jobs:
     # stand-in.
     container:
       image: ghcr.io/bixbeta/sartools:latest
+    # the image's default shell is dash, which has no `set -o pipefail`
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - uses: actions/checkout@v4
