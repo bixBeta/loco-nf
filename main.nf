@@ -11,6 +11,7 @@ params.listContigs      = false
 params.id               = "TREX_ID"
 params.contigs          = null
 params.launch           = true
+params.report           = true
 params.minlen           = 1000000
 
 // --sif, --sifdir, --threads, --mem and --maxforks are declared in
@@ -51,6 +52,7 @@ Args:
                        It lives outside nextflow's work dir, so snakemake keeps
                        its state there and a failed run resumes where it stopped.
     * --threads      : cores handed to snakemake < default: 32 >
+    * --report       : render an html report when the run finishes < default: true >
     * --launch       : run loco-pipe after preparing < default: true >
                        --launch false stops after writing the tables, so the
                        grouping can be checked before committing to a long run
@@ -266,6 +268,7 @@ def readSheet() {
 
 
 include {   LOCOPIPE   } from './modules/locopipe'
+include {   REPORT     } from './modules/report'
 
 
 workflow RUN {
@@ -322,6 +325,13 @@ workflow RUN {
 
     LOCOPIPE( ch_pin, ch_samples, ch_contigs, ch_bams, channel.value(refpath),
               channel.value(outdir), file(params.ref), file("${params.ref}.fai") )
+
+    // The report reads the finished results, so it waits on LOCOPIPE rather
+    // than on the outdir existing.
+    if( params.launch && params.report ) {
+
+        REPORT( ch_pin, LOCOPIPE.out.versions.map { outdir } )
+    }
 
     if( !params.launch ) {
 

@@ -1,0 +1,401 @@
+---
+params:
+  title: title
+  outdir: locopipe
+date: today
+
+title: "`r params$title`"
+author: <a href="https://trex.biotech.cornell.edu/"> Transcriptional Regulation & Expression Facility </a>
+format:
+  html:
+    standalone: true
+    embed-resources: true
+    toc: true
+    toc-location: left
+    toc-title: "Summary"
+    grid:
+      content-mode: full
+      sidebar-width: 350px
+      body-width: 1600px
+---
+
+```{=html}
+<style type="text/css">
+  .quarto-title-banner { height: 100px; }
+  .main-container { max-width: 90% !important; margin: auto; }
+  .quarto-title-meta-contents a:hover { color: #c44900; }
+
+  /* paginated tabsets, as used in the deeptools GC bias report */
+  .tab-navigator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .tab-navigator select {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+  .tab-navigator button {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .tab-navigator button:hover { background: #e2e6ea; }
+  .tab-navigator .tab-counter {
+    font-size: 13px;
+    color: #666;
+    white-space: nowrap;
+  }
+  .panel-tabset .nav-tabs { display: none !important; }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".panel-tabset").forEach((tabset, tabsetIndex) => {
+    const tabs = tabset.querySelectorAll(".nav-tabs .nav-link");
+    if (tabs.length < 2) return;
+
+    const storageKey = `activeTab_${tabsetIndex}`;
+
+    const nav = document.createElement("div");
+    nav.className = "tab-navigator";
+
+    const prev = document.createElement("button");
+    prev.textContent = "◀ Prev";
+
+    const select = document.createElement("select");
+    tabs.forEach((tab, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = tab.textContent.trim();
+      if (tab.classList.contains("active")) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    const next = document.createElement("button");
+    next.textContent = "Next ▶";
+
+    const counter = document.createElement("span");
+    counter.className = "tab-counter";
+
+    nav.append(prev, select, next, counter);
+    tabset.prepend(nav);
+
+    const updateCounter = (i) => { counter.textContent = `${i + 1} / ${tabs.length}`; };
+
+    const goTo = (i) => {
+      tabs[i].click();
+      select.value = i;
+      updateCounter(i);
+      sessionStorage.setItem(storageKey, i);
+    };
+
+    const saved = sessionStorage.getItem(storageKey);
+    const initialIndex = saved !== null ? +saved : [...tabs].findIndex(t => t.classList.contains("active"));
+    goTo(initialIndex >= 0 ? initialIndex : 0);
+
+    select.addEventListener("change", () => goTo(+select.value));
+    prev.addEventListener("click", () => { const c = +select.value; goTo(c > 0 ? c - 1 : tabs.length - 1); });
+    next.addEventListener("click", () => { const c = +select.value; goTo(c < tabs.length - 1 ? c + 1 : 0); });
+
+    tabset.setAttribute("tabindex", "0");
+    tabset.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") next.click();
+      if (e.key === "ArrowLeft")  prev.click();
+    });
+  });
+});
+</script>
+```
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+suppressPackageStartupMessages({
+  library(DT)
+  library(dplyr)
+})
+
+# Every module in loco-pipe can be switched off in locopipe.yaml, so nothing
+# here assumes a file exists. A section that has no figures says so rather than
+# failing the render.
+fig <- function(path, width = "1000px") {
+  if (file.exists(path)) {
+    cat(sprintf("![](%s){width=%s}\n\n", path, width))
+  } else {
+    cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
+  }
+}
+
+# One paginated tabset per collection of per-sample / per-population figures.
+# The navigator above replaces the tab bar, so this only has to emit the panels.
+tabset <- function(paths, labels, width = "1000px") {
+  if (length(paths) == 0) {
+    cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
+    return(invisible(NULL))
+  }
+  cat("::: {.panel-tabset}\n\n")
+  for (i in seq_along(paths)) {
+    cat(paste0("## ", labels[i], "\n\n"))
+    cat(paste0("![](", paths[i], "){width=", width, "}\n\n"))
+  }
+  cat(":::\n\n")
+}
+
+# figures/<dir>, sorted, with a label derived from the file name
+figs <- function(dir, pattern = "\\.png$", strip = NULL) {
+  if (!dir.exists(dir)) return(list(paths = character(0), labels = character(0)))
+  p <- sort(list.files(dir, pattern = pattern, full.names = TRUE))
+  l <- basename(p)
+  l <- sub("\\.png$", "", l)
+  if (!is.null(strip)) l <- sub(strip, "", l)
+  list(paths = p, labels = l)
+}
+
+cfg <- tryCatch(yaml::yaml.load_file("locopipe.yaml"), error = function(e) NULL)
+
+samples <- tryCatch(read.delim("docs/samples.tsv"), error = function(e) NULL)
+contigs <- tryCatch(read.delim("docs/contigs.tsv", header = FALSE), error = function(e) NULL)
+```
+
+This report collects the diagnostic figures produced by
+[loco-pipe](https://github.com/sudmantlab/loco-pipe) for your low coverage
+whole genome sequencing experiment. The analyses and their defaults are
+loco-pipe's; this document assembles the output and records the settings used.
+
+> Users receiving files from RSCshare are advised to delete all files once they
+> have secure copied them to their own respective drives.<br> A copy of your
+> data will be securely archived on our end and may incur a fee for future
+> retrievals.
+
+### Sample Tracking
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if (!is.null(samples)) {
+  datatable(samples, options = list(scrollX = TRUE, pageLength = 15)) |>
+    DT::formatStyle(names(samples), lineHeight = "100%")
+} else {
+  cat("*No docs/samples.tsv found.*")
+}
+```
+
+```{r echo=FALSE, results='asis'}
+if (!is.null(samples) && "population" %in% names(samples)) {
+  n <- length(unique(samples$population))
+  cat(sprintf("\n%d samples in %d group%s: %s.\n\n",
+              nrow(samples), n, ifelse(n == 1, "", "s"),
+              paste(sort(unique(samples$population)), collapse = ", ")))
+  if (n < 2) {
+    cat("Only one group is present, so the analyses that compare groups ",
+        "(Fst in particular) have nothing to compare.\n\n", sep = "")
+  }
+}
+```
+
+## Analysis settings
+
+The thresholds below shaped every result in this report. They are loco-pipe's
+defaults unless they were edited in `locopipe.yaml` before the run.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+settings <- function(cfg) {
+  if (is.null(cfg)) return(NULL)
+  pick <- list(
+    c("snp_calling_global", "minind_proportion", "fraction of samples a site must have data in"),
+    c("snp_calling_global", "mindepthind",       "minimum depth per individual"),
+    c("snp_calling_global", "minmaf",            "minor allele frequency cutoff for SNP calling"),
+    c("snp_calling_global", "pval",              "p-value for the SNP likelihood ratio test"),
+    c("get_depth_filter_global", "n_sd",         "depth cutoffs, in SDs of the fitted distribution"),
+    c("get_depth_global", "minq",                "minimum base quality"),
+    c("get_depth_global", "minmapq",             "minimum mapping quality"),
+    c("get_maf", "minind",                       "minimum individuals for allele frequencies"),
+    c("run_pcangsd_global", "minmaf",            "minor allele frequency cutoff for PCA"),
+    c("get_fst", "snp_window_size",              "Fst window, in SNPs"),
+    c("get_fst", "bp_window_size",               "Fst window, in bp"),
+    c("get_theta", "window_size",                "theta window, in bp"),
+    c("lostruct", "snp_window_size",             "local PCA window, in SNPs"),
+    c("lostruct", "z_cutoff",                    "z-score for calling a local PCA outlier")
+  )
+  rows <- lapply(pick, function(p) {
+    v <- tryCatch(cfg[[p[1]]][[p[2]]], error = function(e) NULL)
+    if (is.null(v)) return(NULL)
+    data.frame(section = p[1], setting = p[2], value = as.character(v), meaning = p[3])
+  })
+  rows <- Filter(Negate(is.null), rows)
+  if (length(rows) == 0) return(NULL)
+  do.call(rbind, rows)
+}
+
+s <- settings(cfg)
+if (!is.null(s)) {
+  datatable(s, rownames = FALSE, options = list(dom = "t", pageLength = 50, scrollX = TRUE))
+} else {
+  cat("*No locopipe.yaml found, so the settings could not be read.*")
+}
+```
+
+```{r echo=FALSE, results='asis'}
+if (!is.null(contigs)) {
+  cat(sprintf("\nAnalyses were parallelised over **%d contig%s**: %s.\n\n",
+              nrow(contigs), ifelse(nrow(contigs) == 1, "", "s"),
+              paste(head(contigs[[1]], 20), collapse = ", ")))
+  if (nrow(contigs) > 20) cat(sprintf("(first 20 of %d shown)\n\n", nrow(contigs)))
+}
+```
+
+## Depth and site filtering
+
+Read depth is counted across every included contig, a distribution is fitted,
+and sites with anomalously low or high global depth are excluded. Filtering on
+depth removes collapsed repeats and paralogues, which otherwise masquerade as
+variable sites.
+
+```{r echo=FALSE, results='asis'}
+fig("figures/depth/depth_filter.png")
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if (file.exists("depth_filter.tsv")) {
+  df <- tryCatch(read.delim("depth_filter.tsv"), error = function(e) NULL)
+  if (!is.null(df)) datatable(df, rownames = FALSE, options = list(dom = "t", scrollX = TRUE))
+}
+```
+
+## Population structure
+
+### PCAngsd — all samples
+
+A covariance matrix is estimated from genotype likelihoods, so low coverage
+individuals are not forced to a hard genotype call. Clustering here reflects
+the dominant axes of variation across every sample.
+
+```{r echo=FALSE, results='asis'}
+fig("figures/pcangsd/global/combined.subsetted.png")
+```
+
+### PCAngsd — within each group
+
+```{r echo=FALSE, results='asis'}
+f <- figs("figures/pcangsd/local", strip = "\\.combined\\.subsetted$")
+tabset(f$paths, f$labels)
+```
+
+### Ohana admixture — all samples
+
+Ancestry proportions estimated across a range of `k`. No single `k` is
+"correct"; consistency of the components across values is more informative than
+any one panel.
+
+```{r echo=FALSE, results='asis'}
+fig("figures/ohana/global/combined.subsetted.png")
+```
+
+### Ohana admixture — within each group
+
+```{r echo=FALSE, results='asis'}
+f <- figs("figures/ohana/local", strip = "\\.combined\\.subsetted$")
+tabset(f$paths, f$labels)
+```
+
+## Diversity
+
+### Site frequency spectrum
+
+The folded or unfolded SFS per group, estimated from genotype likelihoods. Its
+shape underlies the theta and neutrality statistics below, so an implausible
+spectrum invalidates those.
+
+```{r echo=FALSE, results='asis'}
+f <- figs("figures/sfs", strip = "\\.sfs$")
+tabset(f$paths, f$labels)
+```
+
+### Theta and neutrality statistics
+
+```{r echo=FALSE, results='asis'}
+f <- figs("figures/theta", strip = "\\.theta_by_window$")
+tabset(f$paths, f$labels)
+```
+
+### Heterozygosity
+
+Per individual heterozygosity, estimated from the per sample SFS. Outliers here
+often indicate contamination or unusually low coverage rather than biology.
+
+```{r echo=FALSE, results='asis'}
+fig("figures/heterozygosity/heterozygosity.png")
+```
+
+## Differentiation
+
+Fst between each pair of groups, shown genome wide and in sliding windows.
+
+```{r echo=FALSE, results='asis'}
+f <- figs("figures/fst")
+tabset(f$paths, f$labels)
+```
+
+## Local PCA
+
+lostruct runs a PCA in windows along the genome and places the windows in an
+MDS space, so regions whose structure departs from the genome average stand
+out. Those outliers are typically inversions or other regions of suppressed
+recombination.
+
+```{r echo=FALSE, results='asis'}
+fig("figures/lostruct/global/combined.mds.png")
+fig("figures/lostruct/global/separated.mds.png")
+fig("figures/lostruct/global/combined.pca.png")
+# separated.pca ships as a PDF; makeReport.sh converts it alongside
+fig("figures/lostruct/global/separated.pca.png")
+```
+
+## Citations
+
+<details>
+
+loco-pipe is published in Bioinformatics Advances:
+<https://doi.org/10.1093/bioadv/vbae098>. Please cite it if you use these
+results.
+
+- **ANGSD** — Korneliussen, Albrechtsen & Nielsen (2014), *BMC Bioinformatics*.
+  <https://doi.org/10.1186/s12859-014-0356-4>
+- **PCAngsd** — Meisner & Albrechtsen (2018), *Genetics*.
+  <https://doi.org/10.1534/genetics.118.301336>
+- **Ohana** — Cheng, Mailund & Nielsen (2017), *Bioinformatics*.
+  <https://doi.org/10.1093/bioinformatics/btx481>
+- **lostruct** — Li & Ralph (2019), *Genetics*.
+  <https://doi.org/10.1534/genetics.118.301747>
+- **A beginner's guide to low-coverage WGS** — Lou et al. (2021),
+  *Molecular Ecology*. <https://doi.org/10.1111/mec.16077>
+
+</details>
+
+## Software versions
+
+<details>
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if (file.exists("versions.yml")) {
+  cat(readLines("versions.yml"), sep = "\n")
+} else {
+  cat("See pipeline_info/software_versions.yml alongside this report.")
+}
+```
+
+</details>
+
+## Session Info
+
+<details>
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sessionInfo()
+```
+
+</details>

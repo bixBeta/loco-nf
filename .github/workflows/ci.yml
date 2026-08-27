@@ -80,8 +80,12 @@ jobs:
           cfg=$(nextflow config .)
           echo "$cfg" | grep -q 'file:///workdir/TREx_shared/projects/loco-pipe.sif' || {
             echo "$cfg" | grep -i container; echo "sif path not resolved"; exit 1; }
-          if echo "$cfg" | grep -qE 'docker://|ghcr.io|quay.io' ; then
-            echo "config still references a registry"; exit 1
+          # The analysis image must be local. The report image is deliberately a
+          # registry reference: quarto lives in the sartools image, not in
+          # loco-pipe.sif. Anything else pointing at a registry is a mistake.
+          if echo "$cfg" | grep -E 'docker://|ghcr.io|quay.io' | grep -vE 'qmdimage|qmds' | grep -q . ; then
+            echo "$cfg" | grep -E 'docker://|ghcr.io|quay.io'
+            echo "an analysis container references a registry"; exit 1
           fi
           echo "sif resolution OK"
 
@@ -95,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          out=$(nextflow run . -stub-run -c test/ci.config \
+          out=$(nextflow run . -stub-run -c test/ci.config --report true \
                   --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa" 2>&1)
           rc=$?
           set -e
@@ -408,10 +412,13 @@ jobs:
 
       - name: Stub run
         run: |
-          nextflow run . -stub-run -c test/ci.config \
+          nextflow run . -stub-run -c test/ci.config --report true \
             --sheet test/sample-sheet.csv \
             --ref   "$PWD/test/ref/ref.fa" \
             --id    CI_TEST
+          test -f pipeline_info/CI_TEST-loco-report.html || {
+            echo "the report was not published"; exit 1; }
+          echo "report wiring OK"
 
       - name: Shell scripts lint
         run: |
@@ -421,3 +428,88 @@ jobs:
           bash -n test/make_test_data.sh
           bash -n test/fake-locopipe
           bash -n toyfish/make-sheet.sh
+
+  report:
+    name: render the report (sartools image)
+    runs-on: ubuntu-latest
+    # quarto, R, DT and ImageMagick all live in this image, which is what the
+    # pipeline renders with, so CI exercises the real thing rather than a
+    # stand-in.
+    container:
+      image: ghcr.io/bixbeta/sartools:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build a fixture results directory
+        run: |
+          set -euo pipefail
+          FIX=$PWD/fixture
+          mkdir -p $FIX/docs \
+                   $FIX/figures/depth $FIX/figures/heterozygosity \
+                   $FIX/figures/pcangsd/global $FIX/figures/pcangsd/local \
+                   $FIX/figures/sfs $FIX/figures/fst \
+                   $FIX/figures/lostruct/global
+          png() { convert -size 40x30 xc:white "$1" ; }
+          png $FIX/figures/depth/depth_filter.png
+          png $FIX/figures/heterozygosity/heterozygosity.png
+          png $FIX/figures/pcangsd/global/combined.subsetted.png
+          png $FIX/figures/pcangsd/local/alpha.combined.subsetted.png
+          png $FIX/figures/pcangsd/local/beta.combined.subsetted.png
+          png $FIX/figures/sfs/alpha.sfs.png
+          png $FIX/figures/sfs/beta.sfs.png
+          png $FIX/figures/fst/alpha.beta.png
+          png $FIX/figures/lostruct/global/combined.mds.png
+          # a PDF figure, as lostruct really emits, to exercise the conversion
+          convert -size 40x30 xc:white $FIX/figures/lostruct/global/separated.pca.pdf
+          printf 'sample_name\tbam\tpopulation\nS1\t/x/S1.bam\talpha\nS2\t/x/S2.bam\tbeta\n' > $FIX/docs/samples.tsv
+          printf 'chr_big\t1\nchr_mid\t2\n' > $FIX/docs/contigs.tsv
+          cat > $FIX/locopipe.yaml <<'YAML'
+          global:
+            gl_model: 1
+          snp_calling_global:
+            minind_proportion: "0.5"
+            minmaf: "0.05"
+            pval: "1e-6"
+          get_depth_filter_global:
+            n_sd: 2
+          get_fst:
+            snp_window_size: 100
+            bp_window_size: 10000
+          YAML
+          echo "fixture ready"
+
+      # Runs the real template, with the three variables nextflow would supply,
+      # so the shipped script is what gets exercised.
+      - name: Render
+        run: |
+          set -euo pipefail
+          FIX=$PWD/fixture
+          sed -e "s|\${projectDir}|$PWD|g" \
+              -e "s|\${outdir}|$FIX|g" \
+              -e "s|\${id}|CI_TEST|g" \
+              modules/report/templates/makeReport.sh | sed 's|\\\$|$|g' > /tmp/render.sh
+          bash -n /tmp/render.sh
+          mkdir -p /tmp/render && cd /tmp/render
+          bash /tmp/render.sh
+          test -f CI_TEST-loco-report.html || { echo "no report produced"; exit 1; }
+          echo "rendered $(du -h CI_TEST-loco-report.html | cut -f1)"
+
+      - name: The report is self contained and complete
+        run: |
+          set -euo pipefail
+          H=/tmp/render/CI_TEST-loco-report.html
+          # embed-resources: no external image references left
+          if grep -qE '<img[^>]+src="(figures|\./figures)' "$H" ; then
+            echo "figures were linked rather than embedded"; exit 1
+          fi
+          grep -q 'Sample Tracking'       "$H" || { echo "no sample tracking"; exit 1; }
+          grep -q 'Analysis settings'     "$H" || { echo "no settings"; exit 1; }
+          grep -q 'Depth and site filtering' "$H" || { echo "no depth section"; exit 1; }
+          grep -q 'Population structure'  "$H" || { echo "no structure"; exit 1; }
+          grep -q 'Local PCA'             "$H" || { echo "no local pca"; exit 1; }
+          # the paginator has to reach the html, or the tabsets are unusable
+          grep -q 'tab-navigator'         "$H" || { echo "paginator missing"; exit 1; }
+          # theta was absent from the fixture: the section must say so, not fail
+          grep -q 'This module was not run' "$H" || { echo "missing-module note absent"; exit 1; }
+          echo "report content OK"

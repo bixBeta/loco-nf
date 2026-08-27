@@ -56,6 +56,12 @@ threads:       32
 mem:           200                    # GB
 maxforks:      1
 
+# ---- report -----------------------------------------------------------------
+# Rendered with quarto in the sartools image, which already carries quarto, DT
+# and ImageMagick. Point qmdimage at a local .sif to avoid pulling it.
+report:        true
+# qmdimage:    /workdir/TREx_shared/projects/sartools.sif
+
 # ---- handoff ----------------------------------------------------------------
 # false stops after writing the tables, so the grouping can be checked before
 # committing to a long run. Rerun with launch: true to continue.
