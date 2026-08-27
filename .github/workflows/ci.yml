@@ -61,7 +61,7 @@ jobs:
           # default engine is singularity: the container directive must point at
           # a local .sif, and nothing may reference a registry
           cfg=$(nextflow config .)
-          echo "$cfg" | grep -q 'file:///workdir/TREx_shared/software/loco-pipe.sif' || {
+          echo "$cfg" | grep -q 'file:///workdir/TREx_shared/projects/loco-pipe.sif' || {
             echo "$cfg" | grep -i container; echo "sif path not resolved"; exit 1; }
           if echo "$cfg" | grep -qE 'docker://|ghcr.io|quay.io' ; then
             echo "config still references a registry"; exit 1

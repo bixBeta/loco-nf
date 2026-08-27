@@ -36,9 +36,11 @@ minlen:        1000000                # bp
 # contigs:     contigs.txt            # one contig per line, optional 2nd column of plot names
 
 # ---- the image --------------------------------------------------------------
-# Built locally with containers/build-sif.sh and never pulled.
-sifdir:        /workdir/TREx_shared/software
-# sif:         /workdir/TREx_shared/software/loco-pipe.sif
+# Built locally with containers/build-sif.sh and never pulled. This is where the
+# image already lives on the TREx server, so neither line needs changing there.
+# Anywhere else, uncomment sif and give the full path.
+sifdir:        /workdir/TREx_shared/projects
+# sif:         /some/other/place/loco-pipe.sif
 
 # ---- resources --------------------------------------------------------------
 # threads is handed straight to snakemake as -@ and reserved by nextflow, so the

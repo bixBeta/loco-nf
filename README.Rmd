@@ -37,6 +37,8 @@ apptainer exec loco-pipe.sif loco-pipe-check
 
 That resolves every binary the workflow calls and loads every R package the scripts use. Build it, or check it after copying it to a new host, following [containers/README.md](containers/README.md).
 
+On the TREx server the image already sits at `/workdir/TREx_shared/projects/loco-pipe.sif`, which is the default, so nothing needs pointing at it. Anywhere else, pass `--sif /full/path/to/loco-pipe.sif`.
+
 ### The Nextflow front-end
 
 loco-pipe reads two tab separated tables. The front-end writes them from one comma separated sample sheet, validates everything at launch, and hands off:
