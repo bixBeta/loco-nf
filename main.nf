@@ -299,10 +299,18 @@ workflow LOCOPIPE {
         contigs = keep.collect { it.name }.join("\n") + "\n"
     }
 
+    // `loco-pipe init` requires the bam files themselves: it validates that each
+    // exists and is readable before laying the project out. Passing the real
+    // ones means that check runs inside the container, so a missing bind mount
+    // is caught here rather than by angsd much later. Its samples.tsv is still
+    // overwritten below, since init puts every sample in one group.
+    def bamlist = rows.collect { "'" + it.bam + "'" }.join(' ')
+
     ch_samples = channel.value(samples)
     ch_contigs = channel.value(contigs)
+    ch_bams    = channel.value(bamlist)
 
-    PREPARE_PROJECT( ch_pin, ch_samples, ch_contigs, file(params.ref), file("${params.ref}.fai") )
+    PREPARE_PROJECT( ch_pin, ch_samples, ch_contigs, ch_bams, file(params.ref), file("${params.ref}.fai") )
 
     if( params.launch ) {
 

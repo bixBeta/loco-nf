@@ -14,10 +14,14 @@
 
 set -euo pipefail
 
+ARGV=("$@")
+
+# records the whole invocation, not just the subcommand, so CI can assert on
+# the arguments the module actually passed
 capture() {
     [ -n "${CI_CAPTURE:-}" ] || return 0
     mkdir -p "$CI_CAPTURE"
-    printf '%s\n' "$@" > "${CI_CAPTURE}/${1}.command.txt"
+    printf '%s\n' "${ARGV[@]}" > "${CI_CAPTURE}/${1}.command.txt"
 }
 
 SUBCMD="${1:-}"
@@ -31,17 +35,41 @@ case "$SUBCMD" in
 
     init)
         shift
-        OUT="" ; REF=""
+        OUT="" ; REF="" ; SAMPLES=()
         while [ $# -gt 0 ] ; do
             case "$1" in
                 -o) OUT="$2" ; shift 2 ;;
                 -r) REF="$2" ; shift 2 ;;
-                *)  shift ;;
+                *)  SAMPLES+=("$1") ; shift ;;
             esac
         done
         [ -n "$OUT" ] || { echo "fake-locopipe: init needs -o" >&2 ; exit 1 ; }
         [ -n "$REF" ] || { echo "fake-locopipe: init needs -r" >&2 ; exit 1 ; }
         [ -f "$REF" ] || { echo "fake-locopipe: no such reference: $REF" >&2 ; exit 1 ; }
+
+        # The real CLI validates SAMPLES with locopipe.validation.BAMfile: at
+        # least one is required, each must exist and be readable, and a file
+        # must end in .bam ( a directory is globbed for *.bam instead ).
+        # Reproduced here because passing the wrong thing was a real bug that a
+        # laxer fake let through.
+        [ "${#SAMPLES[@]}" -ge 1 ] || {
+            echo "Usage: loco-pipe init [OPTIONS] SAMPLES..." >&2
+            echo "Error: Missing argument 'SAMPLES...'." >&2 ; exit 1 ; }
+        for s in "${SAMPLES[@]}" ; do
+            if [ -d "$s" ] ; then
+                compgen -G "${s}/*.bam" > /dev/null || {
+                    echo "Error: There were no files ending with the accepted alignment extensions .bam (case insensitive) in ${s}." >&2
+                    exit 1 ; }
+                continue
+            fi
+            [ -e "$s" ] || { echo "Error: Invalid value for 'SAMPLES...': ${s} was not found." >&2 ; exit 1 ; }
+            case "$s" in
+                *.bam|*.BAM|*.Bam) : ;;
+                *) echo "Error: Invalid value for 'SAMPLES...': ${s} does not end with the accepted extensions for alignment files: .bam (case insensitive)." >&2
+                   exit 1 ;;
+            esac
+            [ -r "$s" ] || { echo "Error: Alignment file ${s} does not have user read permission." >&2 ; exit 1 ; }
+        done
 
         # upstream writes docs/, locopipe.yaml, and workflow/ next to the project
         mkdir -p "${OUT}/docs" workflow/pipelines

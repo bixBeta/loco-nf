@@ -27,6 +27,7 @@ process PREPARE_PROJECT {
         val   pin
         val   samples
         val   contigs
+        val   bams
         path  ref
         path  fai
 
@@ -38,10 +39,12 @@ process PREPARE_PROJECT {
     """
     ${onPath}
 
-    # init lays out docs/, locopipe.yaml and the workflow/ tree. It wants bam
-    # paths, but we overwrite its samples.tsv immediately, so it is given the
-    # reference only and a placeholder bam list it never uses.
-    loco-pipe init -o ${project} -r ${ref} ${ref} > init.log 2>&1 || {
+    # init lays out docs/, locopipe.yaml and the workflow/ tree. It takes the bam
+    # files themselves ( not the reference ) as its positional argument, and
+    # checks each one exists and is readable, which also proves the container can
+    # see them. Its samples.tsv is overwritten below, since init assigns every
+    # sample to a single group.
+    loco-pipe init -o ${project} -r ${ref} ${bams} > init.log 2>&1 || {
         cat init.log ; exit 1 ; }
 
     # the two tables the sheet actually determines

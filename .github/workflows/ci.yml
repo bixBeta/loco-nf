@@ -185,6 +185,15 @@ jobs:
 
           # -@ matches what nextflow reserved, not a hardcoded number
           grep -qx -- '2' "$CI_CAPTURE/start.command.txt" || fail "-@ did not match task.cpus"
+
+          # init takes the bam files as SAMPLES; passing anything else ( the
+          # reference, say ) is rejected by the real CLI's BAMfile validator.
+          # The reference must appear exactly once, as the value of -r; twice
+          # means it was also passed positionally, which is the bug this guards.
+          [ "$(grep -c '\.bam$' "$CI_CAPTURE/init.command.txt")" -eq 4 ] \
+            || fail "init was not given the 4 bam files as SAMPLES"
+          [ "$(grep -c 'ref\.fa$' "$CI_CAPTURE/init.command.txt")" -eq 1 ] \
+            || fail "the reference was passed to init more than once"
           echo "table generation OK"
 
       # A relative bam path validates fine at launch but would be unusable from
