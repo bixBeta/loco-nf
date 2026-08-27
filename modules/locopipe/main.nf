@@ -6,9 +6,11 @@
 project      = params.project
 threads      = params.threads
 
-// resolved in nextflow.config from --locopipebin; empty when running in the
-// image, where loco-pipe and loco-pipe-local are already on PATH
-onPath       = params.bindir ? "export PATH=\"${params.bindir}:\$PATH\"" : ""
+// --locopipebin points at a loco-pipe binary on the host; loco-pipe-local ships
+// beside it, so the whole directory goes on PATH. Derived here rather than in
+// nextflow.config, where file() is not available. Empty when running in the
+// image, which already has both on PATH.
+onPath       = params.locopipebin ? "export PATH=\"${file(params.locopipebin).parent}:\$PATH\"" : ""
 
 
 process PREPARE_PROJECT {
