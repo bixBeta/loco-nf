@@ -1,6 +1,18 @@
 loco-pipe: a Snakemake pipeline for low-coverage whole-genome sequencing
 ================
 
+[![ci](https://github.com/bixBeta/loco-nf/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bixBeta/loco-nf/actions/workflows/ci.yml)
+[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-25.04.1-23aa62.svg)](https://www.nextflow.io/)
+[![Singularity](https://img.shields.io/badge/container-Singularity-1d355c.svg)](https://sylabs.io/singularity/)
+[![angsd 0.940](https://img.shields.io/badge/angsd-0.940-blue.svg)](https://www.popgen.dk/angsd/)
+[![pcangsd 1.36.4](https://img.shields.io/badge/pcangsd-1.36.4-blue.svg)](https://github.com/Rosemeis/pcangsd)
+[![ohana 0.1](https://img.shields.io/badge/ohana-0.1-blue.svg)](https://github.com/jade-cheng/ohana)
+[![R 4.2](https://img.shields.io/badge/R-4.2-276DC3.svg)](https://www.r-project.org/)
+[![based on loco-pipe](https://img.shields.io/badge/based%20on-loco--pipe-orange.svg)](https://github.com/sudmantlab/loco-pipe)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-lightgrey.svg)](LICENSE)
+
+<hr>
+
 - <a href="#running-this-fork" id="toc-running-this-fork">Running this fork</a>
   - <a href="#the-image" id="toc-the-image">The image</a>
   - <a href="#the-nextflow-front-end" id="toc-the-nextflow-front-end">The Nextflow front-end</a>
