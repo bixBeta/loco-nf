@@ -20,6 +20,18 @@ loco-pipe: a Snakemake pipeline for low-coverage whole-genome sequencing
   directions</a>
 - <a href="#citation" id="toc-citation">Citation</a>
 
+> ### Credit
+>
+> This is a **containerized version** of
+> [loco-pipe](https://github.com/sudmantlab/loco-pipe), by the [Sudmant
+> Lab](https://github.com/sudmantlab). All of the science and the pipeline
+> itself are their work; this repository only packages the dependencies into a
+> single Apptainer/Singularity image so the pipeline runs without building
+> conda environments at run time.
+>
+> The container is documented in [container/README.md](container/README.md).
+> Please cite the original authors — see [Citation](#citation).
+
 **loco-pipe** is an automated Snakemake pipeline that streamlines a set
 of essential population genomic analyses for **lo**w-**co**verage whole
 genome sequencing (lcWGS) data.
