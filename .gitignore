@@ -60,3 +60,6 @@ toyfish/.snakemake/*
 # container images
 *.sif
 *.tar
+
+# macOS
+.DS_Store
