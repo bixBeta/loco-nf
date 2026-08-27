@@ -125,21 +125,9 @@ loco-pipe    : ${params.engine == "local" ? params.locopipebin : params.image}
 
 // Fail here, with the resolved path, rather than a task dying much later.
 // Skipped for -stub-run, which never reads any of these.
-def checkInputs() {
+def checkRef() {
 
     if( workflow.stubRun ) return
-
-    // singularity: the .sif must exist. local: the binary must exist.
-    if( params.engine == "local" ) {
-        if( !file(params.locopipebin).exists() )
-            error "No loco-pipe found at: ${params.locopipebin}"
-    }
-    else {
-        def sif = params.image - "file://"
-        if( !file(sif).exists() )
-            error """No loco-pipe image at: ${sif}
-    Build it with container/build-sif.sh, or point --sif at an existing one."""
-    }
 
     if( !params.ref )
         error "No reference provided. Use --ref < full path to the reference fasta >"
@@ -152,15 +140,7 @@ def checkInputs() {
     if( !file("${params.ref}.fai").exists() )
         error """No fasta index at: ${params.ref}.fai
     Build one with:  samtools faidx ${params.ref}"""
-
-    if( !file(params.sheet).exists() )
-        error "No sample sheet at: ${params.sheet}. See --help for the columns."
-
-    if( params.contigs && !file(params.contigs).exists() )
-        error "No contig list at: ${params.contigs}"
 }
-
-checkInputs()
 
 
 // The reference is the authority on what may be analysed, so the contig list is
@@ -176,9 +156,13 @@ def faiContigs() {
 }
 
 
+// Only the reference is needed to list contigs: this is how you decide what to
+// analyse, so it has to work before an image or a sheet exists.
 if( params.listContigs ) {
 
     if( workflow.stubRun ) exit 0
+
+    checkRef()
 
     def rows = faiContigs().sort { -it.len }
     def keep = rows.findAll { it.len >= params.minlen }
@@ -195,6 +179,36 @@ ${keep.size() > 100 ? "\n  ${keep.size()} is more than the ~100 loco-pipe is com
 
     exit 0
 }
+
+
+// Everything a real run needs. Checked after the utility modes above, which
+// deliberately work without an image.
+def checkInputs() {
+
+    if( workflow.stubRun ) return
+
+    checkRef()
+
+    // singularity: the .sif must exist. local: the binary must exist.
+    if( params.engine == "local" ) {
+        if( !file(params.locopipebin).exists() )
+            error "No loco-pipe found at: ${params.locopipebin}"
+    }
+    else {
+        def sif = params.image - "file://"
+        if( !file(sif).exists() )
+            error """No loco-pipe image at: ${sif}
+    Build it with container/build-sif.sh, or point --sif at an existing one."""
+    }
+
+    if( !file(params.sheet).exists() )
+        error "No sample sheet at: ${params.sheet}. See --help for the columns."
+
+    if( params.contigs && !file(params.contigs).exists() )
+        error "No contig list at: ${params.contigs}"
+}
+
+checkInputs()
 
 
 // Read the sheet here rather than in a process, so a malformed sheet is a

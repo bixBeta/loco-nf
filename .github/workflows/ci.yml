@@ -71,11 +71,19 @@ jobs:
       - name: Help text
         run: nextflow run . --help
 
+      # Listing contigs must work with nothing but a reference: no image, no
+      # sheet. It is how you decide what to analyse in the first place.
       - name: List contigs
         run: |
           set -euo pipefail
+          # set +e around the capture so a failing run prints instead of
+          # aborting the step silently
+          set +e
           out=$(nextflow run . --ref test/ref/ref.fa --listContigs 2>&1)
-          echo "$out" | grep -q 'chr_big'   || { echo "$out" | tail -20; exit 1; }
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
+          echo "$out" | grep -q 'chr_big'        || { echo "$out" | tail -20; exit 1; }
           echo "$out" | grep -q 'below --minlen' || { echo "$out" | tail -20; echo "minlen not reported"; exit 1; }
 
       # Non blocking: reports what the v2 strict parser makes of the pipeline,
@@ -188,17 +196,25 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf locopipe
+          set +e
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-onegroup.csv \
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" --threads 2 2>&1)
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
           echo "$out" | grep -q "every sample is in group" || { echo "$out" | tail -20; exit 1; }
 
       - name: --launch false stops after preparing
         run: |
           set -euo pipefail
           rm -rf locopipe
+          set +e
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --launch false 2>&1)
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
           echo "$out" | grep -q 'did not launch it' || { echo "$out" | tail -20; exit 1; }
           test -f locopipe/docs/samples.tsv
           echo "$out" | grep -q 'LOCOPIPE_RUN' && { echo "LOCOPIPE_RUN ran anyway"; exit 1; }
