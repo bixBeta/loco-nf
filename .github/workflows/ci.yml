@@ -247,6 +247,12 @@ jobs:
             || fail "init was not given the 4 bam files as SAMPLES"
           [ "$(grep -c 'ref\.fa$' "$CI_CAPTURE/init.command.txt")" -eq 1 ] \
             || fail "the reference was passed to init more than once"
+
+          # init records the reference into locopipe.yaml, which a later task
+          # reads, so it must be the real location and not this task's staged
+          # symlink ( a bare "ref.fa" would resolve to the wrong task dir )
+          grep -qx "$PWD/test/ref/ref.fa" "$CI_CAPTURE/init.command.txt" \
+            || fail "init was given a staged reference rather than its real path"
           echo "table generation OK"
 
       # A relative bam path validates fine at launch but would be unusable from

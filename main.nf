@@ -310,7 +310,14 @@ workflow LOCOPIPE {
     ch_contigs = channel.value(contigs)
     ch_bams    = channel.value(bamlist)
 
-    PREPARE_PROJECT( ch_pin, ch_samples, ch_contigs, ch_bams, file(params.ref), file("${params.ref}.fai") )
+    // init records the reference path into locopipe.yaml, and loco-pipe reads it
+    // from a different task later. Give it the real location rather than the
+    // staged symlink in this task's directory, which points into the launcher's
+    // resolved filesystem and is not reachable from the next task.
+    def refpath = file(params.ref).toAbsolutePath().normalize().toString()
+
+    PREPARE_PROJECT( ch_pin, ch_samples, ch_contigs, ch_bams, channel.value(refpath),
+                     file(params.ref), file("${params.ref}.fai") )
 
     if( params.launch ) {
 
