@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Stand-in for the loco-pipe CLI inside the image, used by CI via --locopipebin.
+#
+# -stub-run skips the real script block entirely, so the actual command line is
+# never exercised. Pointing --locopipebin at this script runs the module for
+# real and records what was asked for so CI can assert on it.
+#
+# It also enforces the contracts that matter: init lays out the project the way
+# upstream does, and start refuses to run without the two tables it reads.
+#
+# The important quirk being reproduced: real `loco-pipe start` exits 0 even when
+# the workflow fails. FAKE_FAIL=1 makes it print a WorkflowError and still exit
+# 0, so CI can prove the module catches it.
+
+set -euo pipefail
+
+capture() {
+    [ -n "${CI_CAPTURE:-}" ] || return 0
+    mkdir -p "$CI_CAPTURE"
+    printf '%s\n' "$@" > "${CI_CAPTURE}/${1}.command.txt"
+}
+
+SUBCMD="${1:-}"
+
+case "$SUBCMD" in
+
+    --help|"")
+        echo "Usage: loco-pipe [init|start]"
+        exit 0
+        ;;
+
+    init)
+        shift
+        OUT="" ; REF=""
+        while [ $# -gt 0 ] ; do
+            case "$1" in
+                -o) OUT="$2" ; shift 2 ;;
+                -r) REF="$2" ; shift 2 ;;
+                *)  shift ;;
+            esac
+        done
+        [ -n "$OUT" ] || { echo "fake-locopipe: init needs -o" >&2 ; exit 1 ; }
+        [ -n "$REF" ] || { echo "fake-locopipe: init needs -r" >&2 ; exit 1 ; }
+        [ -f "$REF" ] || { echo "fake-locopipe: no such reference: $REF" >&2 ; exit 1 ; }
+
+        # upstream writes docs/, locopipe.yaml, and workflow/ next to the project
+        mkdir -p "${OUT}/docs" workflow/pipelines
+        printf 'sample_name\tbam\tpopulation\nplaceholder\t/dev/null\tgroupname\n' > "${OUT}/docs/samples.tsv"
+        printf 'placeholder_contig\t1\n' > "${OUT}/docs/contigs.tsv"
+        printf 'global:\n  basedir: %s\n  reference: %s\n' "$PWD/$OUT" "$REF" > "${OUT}/locopipe.yaml"
+        cat > workflow/config.yaml <<'YAML'
+directory: .
+software-deployment-method: conda
+conda-cleanup-pkgs: cache
+YAML
+        capture init
+        exit 0
+        ;;
+
+    start)
+        shift
+        THREADS="" ; DIR="."
+        while [ $# -gt 0 ] ; do
+            case "$1" in
+                -@) THREADS="$2" ; shift 2 ;;
+                -d) shift ;;
+                *)  DIR="$1" ; shift ;;
+            esac
+        done
+
+        [ -n "$THREADS" ] || { echo "fake-locopipe: start was not told -@ <threads>" >&2 ; exit 1 ; }
+
+        # what real loco-pipe reads; a front-end that wrote them wrong fails here
+        [ -f "${DIR}/docs/samples.tsv" ] || { echo "fake-locopipe: no ${DIR}/docs/samples.tsv" >&2 ; exit 1 ; }
+        [ -f "${DIR}/docs/contigs.tsv" ] || { echo "fake-locopipe: no ${DIR}/docs/contigs.tsv" >&2 ; exit 1 ; }
+
+        head -1 "${DIR}/docs/samples.tsv" | grep -qx "$(printf 'sample_name\tbam\tpopulation')" \
+            || { echo "fake-locopipe: bad samples.tsv header: $(head -1 "${DIR}/docs/samples.tsv")" >&2 ; exit 1 ; }
+
+        # conda deployment must have been stripped, or the image is being ignored
+        if [ -f "${DIR}/workflow/config.yaml" ] && grep -q 'software-deployment-method' "${DIR}/workflow/config.yaml" ; then
+            echo "fake-locopipe: workflow/config.yaml still asks snakemake to build conda envs" >&2
+            exit 1
+        fi
+
+        if [ -n "${CI_CAPTURE:-}" ] ; then
+            mkdir -p "$CI_CAPTURE"
+            printf '%s\n' "-@" "$THREADS" "$DIR"  > "${CI_CAPTURE}/start.command.txt"
+            cp "${DIR}/docs/samples.tsv"            "${CI_CAPTURE}/samples.tsv"
+            cp "${DIR}/docs/contigs.tsv"            "${CI_CAPTURE}/contigs.tsv"
+        fi
+
+        mkdir -p "${DIR}/figures"
+
+        # the upstream quirk: a failed workflow still exits 0
+        if [ "${FAKE_FAIL:-0}" = "1" ] ; then
+            echo "WorkflowError:"
+            echo "At least one job did not complete successfully."
+            exit 0
+        fi
+
+        echo "104 of 104 steps (100%) done"
+        exit 0
+        ;;
+
+    *)
+        echo "fake-locopipe: unknown subcommand '$SUBCMD'" >&2
+        exit 1
+        ;;
+esac

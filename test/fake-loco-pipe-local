@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Stand-in for loco-pipe-local, which ships next to loco-pipe in the image.
+# Strips the conda deployment keys from the generated snakemake profile, which
+# is what stops snakemake rebuilding every env and ignoring the image.
+#
+# Named fake-loco-pipe-local in the repo and installed as loco-pipe-local by
+# make_test_data.sh, so that --locopipebin's directory carries both names.
+set -euo pipefail
+
+TARGET="${1:-workflow/config.yaml}"
+[ -f "$TARGET" ] || { echo "loco-pipe-local: no $TARGET" >&2 ; exit 1 ; }
+
+sed -i.bak '/software-deployment-method/d; /conda-cleanup-pkgs/d' "$TARGET"
+rm -f "${TARGET}.bak"
+echo "${TARGET}: removed conda deployment keys"

@@ -1,0 +1,55 @@
+# =============================================================================
+#  Copy this next to your sample sheet, edit, and run:
+#
+#      nextflow run bixBeta/loco-nf -r main -params-file params.yaml
+#
+#  Every value below is the pipeline default, so a line only needs changing if
+#  you want something else. Anything on the command line still wins over this
+#  file, which is handy for one-off tweaks:
+#
+#      nextflow run bixBeta/loco-nf -r main -params-file params.yaml --launch false
+#
+#  This is a front-end for loco-pipe. It writes the two tables loco-pipe reads
+#  and then runs it; the analyses themselves are configured in the generated
+#  <project>/locopipe.yaml.
+# =============================================================================
+
+# ---- project ----------------------------------------------------------------
+id:            TREX_ID                # project id, appears in the banner
+sheet:         sample-sheet.csv       # see --help for the columns
+project:       locopipe               # directory loco-pipe writes into
+
+# ---- reference --------------------------------------------------------------
+# Full path to the reference fasta. It must be indexed: a .fai is expected
+# alongside it ( samtools faidx <ref> ). There is no default: this has to be set.
+ref:
+
+# ---- contigs ----------------------------------------------------------------
+# loco-pipe parallelizes by contig, so a fragmented assembly makes far too many
+# jobs. Without an explicit list, every contig in the .fai at least minlen long
+# is used. Check what that gives you first:
+#
+#     nextflow run bixBeta/loco-nf -r main --ref /path/ref.fa --listContigs
+#
+# Keep the count under about 100.
+minlen:        1000000                # bp
+# contigs:     contigs.txt            # one contig per line, optional 2nd column of plot names
+
+# ---- the image --------------------------------------------------------------
+# Built locally with container/build-sif.sh and never pulled.
+sifdir:        /workdir/TREx_shared/software
+# sif:         /workdir/TREx_shared/software/loco-pipe.sif
+
+# ---- resources --------------------------------------------------------------
+# threads is handed straight to snakemake as -@ and reserved by nextflow, so the
+# allocation and what snakemake believes it has cannot drift apart.
+# maxforks is per process: 1 runs a single loco-pipe at a time, which is what you
+# want since snakemake is already parallelizing across every core it was given.
+threads:       32
+mem:           200                    # GB
+maxforks:      1
+
+# ---- handoff ----------------------------------------------------------------
+# false stops after writing the tables, so the grouping can be checked before
+# committing to a long run. Rerun with launch: true to continue.
+launch:        true

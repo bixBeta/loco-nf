@@ -1,0 +1,232 @@
+name: ci
+
+# Front-end checks. loco-pipe itself is not run here: CI points --locopipebin at
+# a fake CLI that enforces the same contracts, so the tables and flags this
+# pipeline generates are checked without needing the image or real data.
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+jobs:
+  stub:
+    name: front-end (NF ${{ matrix.nxf_ver }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 25.04.1 is what the server runs. Nextflow 26 ships a strict script
+        # syntax that rejects top level statements, so the flat layout used
+        # across the bixBeta pipelines (params + if(params.help) + banner at
+        # file scope) will not compile there. Pinned deliberately until that
+        # style question is settled for all the pipelines at once.
+        nxf_ver: [ '25.04.1' ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: ${{ matrix.nxf_ver }}
+
+      - name: Generate test data
+        run: bash test/make_test_data.sh
+
+      - name: params.yaml is in step with the defaults
+        run: |
+          pip install --quiet pyyaml
+          python test/check_params_yaml.py
+
+      - name: Retry policy applies to every process
+        run: |
+          set -euo pipefail
+          # resolved config, not the source, so a withName block that silently
+          # overrode the global setting would show up here
+          nextflow config . | grep -q 'maxRetries'    || { echo "maxRetries missing"; exit 1; }
+          nextflow config . | grep -q 'errorStrategy' || { echo "errorStrategy missing"; exit 1; }
+          nextflow config . | grep -q 'maxForks'      || { echo "maxForks missing"; exit 1; }
+
+      - name: Singularity engine resolves the sif path
+        run: |
+          set -euo pipefail
+          # default engine is singularity: the container directive must point at
+          # a local .sif, and nothing may reference a registry
+          cfg=$(nextflow config .)
+          echo "$cfg" | grep -q 'file:///workdir/TREx_shared/software/loco-pipe.sif' || {
+            echo "$cfg" | grep -i container; echo "sif path not resolved"; exit 1; }
+          if echo "$cfg" | grep -qE 'docker://|ghcr.io|quay.io' ; then
+            echo "config still references a registry"; exit 1
+          fi
+          echo "sif resolution OK"
+
+      - name: Help text
+        run: nextflow run . --help
+
+      - name: List contigs
+        run: |
+          set -euo pipefail
+          out=$(nextflow run . --ref test/ref/ref.fa --listContigs 2>&1)
+          echo "$out" | grep -q 'chr_big'   || { echo "$out" | tail -20; exit 1; }
+          echo "$out" | grep -q 'below --minlen' || { echo "$out" | tail -20; echo "minlen not reported"; exit 1; }
+
+      # Non blocking: reports what the v2 strict parser makes of the pipeline,
+      # so the gap is visible before it becomes mandatory.
+      - name: Strict syntax (NXF_SYNTAX_PARSER=v2) report
+        continue-on-error: true
+        run: |
+          set +e
+          echo "############ config ############"
+          NXF_SYNTAX_PARSER=v2 nextflow config . > /tmp/v2cfg.txt 2>&1
+          echo "exit=$?"
+          grep -viE 'unrecognized config option' /tmp/v2cfg.txt | grep -iE 'error|warn' | head -20
+
+          echo
+          echo "############ script ############"
+          NXF_SYNTAX_PARSER=v2 nextflow run . --help > /tmp/v2run.txt 2>&1
+          echo "exit=$?"
+          grep -vE 'Unrecognized config option' /tmp/v2run.txt | grep -iE '^error|error:|cannot|not allowed|invalid|unexpected' | head -40
+          exit 0
+
+      # ---- sample sheet validation, all expected to fail at launch ----------
+
+      - name: A missing reference index is caught up front
+        run: |
+          set -euo pipefail
+          cp test/ref/ref.fa test/ref/noindex.fa
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/noindex.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q 'No fasta index at' || { echo "$out" | tail -20; exit 1; }
+          echo "$out" | grep -q 'samtools faidx'    || { echo "$out" | tail -20; echo "no fix suggested"; exit 1; }
+
+      - name: A duplicated sample name is rejected
+        run: |
+          set -euo pipefail
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-dup.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q "appears more than once" || { echo "$out" | tail -20; exit 1; }
+
+      - name: A missing bam is named
+        run: |
+          set -euo pipefail
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-missingbam.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q 'S1: no bam at' || { echo "$out" | tail -20; exit 1; }
+
+      - name: A missing column is named, with what was found
+        run: |
+          set -euo pipefail
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-nogroup.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q "missing required column 'group'" || { echo "$out" | tail -20; exit 1; }
+
+      - name: A missing image is reported with the resolved path
+        run: |
+          set -euo pipefail
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --sifdir "$PWD/nosuchdir" 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q 'No loco-pipe image at' || { echo "$out" | tail -20; exit 1; }
+          echo "$out" | grep -q 'build-sif.sh'          || { echo "$out" | tail -20; echo "no fix suggested"; exit 1; }
+
+      # ---- the real thing, against the fake CLI ------------------------------
+
+      - name: Tables are generated exactly as loco-pipe reads them
+        env:
+          CI_CAPTURE: ${{ github.workspace }}/ci-capture
+        run: |
+          set -euo pipefail
+          rm -rf "$CI_CAPTURE" locopipe
+          nextflow run . -c test/ci.config \
+            --sheet test/sample-sheet.csv \
+            --ref   "$PWD/test/ref/ref.fa" \
+            --locopipebin "$PWD/test/bin/loco-pipe" \
+            --id    CI_TEST --threads 2
+
+          # the header loco-pipe expects, and the sheet's groups carried across
+          head -1 "$CI_CAPTURE/samples.tsv" | grep -qx "$(printf 'sample_name\tbam\tpopulation')"
+          grep -qx "$(printf 'S1\t%s/test/bams/S1.bam\talpha' "$PWD")" "$CI_CAPTURE/samples.tsv"
+          grep -qx "$(printf 'S4\t%s/test/bams/S4.bam\tbeta'  "$PWD")" "$CI_CAPTURE/samples.tsv"
+          [ "$(grep -c . "$CI_CAPTURE/samples.tsv")" -eq 5 ]   # header + 4 samples
+
+          # contigs: chr_small is below the default minlen and must be dropped
+          grep -qx 'chr_big'   "$CI_CAPTURE/contigs.tsv"
+          grep -qx 'chr_mid'   "$CI_CAPTURE/contigs.tsv"
+          ! grep -qx 'chr_small' "$CI_CAPTURE/contigs.tsv"
+
+          # -@ matches what nextflow reserved, not a hardcoded number
+          grep -qx -- '2' "$CI_CAPTURE/start.command.txt"
+          echo "table generation OK"
+
+      - name: An explicit contig list wins over minlen
+        env:
+          CI_CAPTURE: ${{ github.workspace }}/ci-capture-contigs
+        run: |
+          set -euo pipefail
+          rm -rf "$CI_CAPTURE" locopipe
+          printf 'chr_small\ttiny\n' > test/contigs.txt
+          nextflow run . -c test/ci.config \
+            --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa" \
+            --contigs "$PWD/test/contigs.txt" \
+            --locopipebin "$PWD/test/bin/loco-pipe" --threads 2
+          grep -q 'chr_small' "$CI_CAPTURE/contigs.tsv"
+          ! grep -q 'chr_big' "$CI_CAPTURE/contigs.tsv"
+
+      - name: A single group warns but still runs
+        run: |
+          set -euo pipefail
+          rm -rf locopipe
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-onegroup.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" --threads 2 2>&1)
+          echo "$out" | grep -q "every sample is in group" || { echo "$out" | tail -20; exit 1; }
+
+      - name: --launch false stops after preparing
+        run: |
+          set -euo pipefail
+          rm -rf locopipe
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --launch false 2>&1)
+          echo "$out" | grep -q 'did not launch it' || { echo "$out" | tail -20; exit 1; }
+          test -f locopipe/docs/samples.tsv
+          echo "$out" | grep -q 'LOCOPIPE_RUN' && { echo "LOCOPIPE_RUN ran anyway"; exit 1; }
+          echo "launch gate OK"
+
+      # The bug this guards against: `loco-pipe start` exits 0 even when the
+      # workflow failed, so without the log check a failed run looks successful.
+      - name: A failed loco-pipe run is not reported as success
+        run: |
+          set -euo pipefail
+          rm -rf locopipe
+          export FAKE_FAIL=1
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" --threads 2 \
+            && { echo "a failed loco-pipe run was reported as success"; exit 1; }
+          echo "failure detection OK"
+
+      - name: Stub run
+        run: |
+          nextflow run . -stub-run -c test/ci.config \
+            --sheet test/sample-sheet.csv \
+            --ref   "$PWD/test/ref/ref.fa" \
+            --id    CI_TEST
+
+      - name: Shell scripts lint
+        run: |
+          set -euo pipefail
+          bash -n container/build-sif.sh
+          bash -n container/toy-test.sh
+          bash -n test/make_test_data.sh
+          bash -n test/fake-locopipe
