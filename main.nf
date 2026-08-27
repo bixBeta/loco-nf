@@ -271,10 +271,27 @@ workflow LOCOPIPE {
     def samples = "sample_name\tbam\tpopulation\n" +
                   rows.collect { "${it.sample}\t${it.bam}\t${it.group}" }.join("\n") + "\n"
 
-    def contigs = params.contigs
-                ? file(params.contigs).text
-                : faiContigs().findAll { it.len >= params.minlen }
-                              .collect { it.name }.join("\n") + "\n"
+    def contigs
+    if( params.contigs ) {
+        contigs = file(params.contigs).text
+    }
+    else {
+        def keep = faiContigs().findAll { it.len >= params.minlen }
+
+        // An empty list is not an error loco-pipe would report: it would simply
+        // analyse nothing. Catch it here, where the reason is obvious.
+        if( !keep && !workflow.stubRun ) {
+            def longest = faiContigs().collect { it.len }.max() ?: 0
+            error """No contig in ${params.ref} is at least ${params.minlen} bp, so there would be nothing to analyse.
+    The longest is ${longest} bp. Lower --minlen, or name the contigs explicitly with --contigs.
+    See --listContigs for what is in the reference."""
+        }
+
+        if( keep.size() > 100 )
+            log.warn "${keep.size()} contigs pass --minlen. loco-pipe parallelizes by contig and is not comfortable much beyond 100; consider raising --minlen or giving --contigs."
+
+        contigs = keep.collect { it.name }.join("\n") + "\n"
+    }
 
     ch_samples = channel.value(samples)
     ch_contigs = channel.value(contigs)

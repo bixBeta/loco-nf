@@ -163,19 +163,28 @@ jobs:
             --locopipebin "$PWD/test/bin/loco-pipe" \
             --id    CI_TEST --threads 2
 
+          # print what was actually captured before asserting on it, so a failed
+          # assertion is diagnosable from the log alone
+          show() { echo "--- $1 ---"; cat "$CI_CAPTURE/$1" 2>&1 || true; echo "---"; }
+          fail() { echo "ASSERTION FAILED: $1"; show samples.tsv; show contigs.tsv; show start.command.txt; exit 1; }
+
           # the header loco-pipe expects, and the sheet's groups carried across
-          head -1 "$CI_CAPTURE/samples.tsv" | grep -qx "$(printf 'sample_name\tbam\tpopulation')"
-          grep -qx "$(printf 'S1\t%s/test/bams/S1.bam\talpha' "$PWD")" "$CI_CAPTURE/samples.tsv"
-          grep -qx "$(printf 'S4\t%s/test/bams/S4.bam\tbeta'  "$PWD")" "$CI_CAPTURE/samples.tsv"
-          [ "$(grep -c . "$CI_CAPTURE/samples.tsv")" -eq 5 ]   # header + 4 samples
+          head -1 "$CI_CAPTURE/samples.tsv" | grep -qx "$(printf 'sample_name\tbam\tpopulation')" \
+            || fail "samples.tsv header"
+          grep -qx "$(printf 'S1\t%s/test/bams/S1.bam\talpha' "$PWD")" "$CI_CAPTURE/samples.tsv" \
+            || fail "S1 row"
+          grep -qx "$(printf 'S4\t%s/test/bams/S4.bam\tbeta'  "$PWD")" "$CI_CAPTURE/samples.tsv" \
+            || fail "S4 row"
+          [ "$(grep -c . "$CI_CAPTURE/samples.tsv")" -eq 5 ] \
+            || fail "expected header + 4 samples"
 
           # contigs: chr_small is below the default minlen and must be dropped
-          grep -qx 'chr_big'   "$CI_CAPTURE/contigs.tsv"
-          grep -qx 'chr_mid'   "$CI_CAPTURE/contigs.tsv"
-          ! grep -qx 'chr_small' "$CI_CAPTURE/contigs.tsv"
+          grep -qx 'chr_big' "$CI_CAPTURE/contigs.tsv"   || fail "chr_big missing"
+          grep -qx 'chr_mid' "$CI_CAPTURE/contigs.tsv"   || fail "chr_mid missing"
+          if grep -qx 'chr_small' "$CI_CAPTURE/contigs.tsv" ; then fail "chr_small should be below --minlen" ; fi
 
           # -@ matches what nextflow reserved, not a hardcoded number
-          grep -qx -- '2' "$CI_CAPTURE/start.command.txt"
+          grep -qx -- '2' "$CI_CAPTURE/start.command.txt" || fail "-@ did not match task.cpus"
           echo "table generation OK"
 
       - name: An explicit contig list wins over minlen
@@ -191,6 +200,19 @@ jobs:
             --locopipebin "$PWD/test/bin/loco-pipe" --threads 2
           grep -q 'chr_small' "$CI_CAPTURE/contigs.tsv"
           ! grep -q 'chr_big' "$CI_CAPTURE/contigs.tsv"
+
+      # Without this the run would simply analyse nothing, which is far harder
+      # to notice than a failure.
+      - name: A minlen that excludes every contig is an error
+        run: |
+          set -euo pipefail
+          rm -rf locopipe
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --minlen 99999999 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q 'nothing to analyse' || { echo "$out" | tail -20; exit 1; }
+          echo "$out" | grep -q 'longest is 2000000' || { echo "$out" | tail -20; echo "longest not reported"; exit 1; }
 
       - name: A single group warns but still runs
         run: |

@@ -12,25 +12,31 @@ cd "$(dirname "$0")"
 mkdir -p ref bams bin
 
 # ---- reference --------------------------------------------------------------
-# Three contigs of different lengths so --minlen has something to filter on.
-# The .fai is written directly rather than with samtools, which CI does not have.
+# Three contigs straddling the default --minlen of 1 Mb, so the default path is
+# what gets exercised: chr_big and chr_mid are kept, chr_small is dropped.
+# Sizing them below 1 Mb would make the auto contig list come out empty and
+# every downstream assertion fail for the wrong reason.
+#
+# 4 MB of text, which the runner writes in well under a second. The .fai is
+# written directly rather than with samtools, which CI does not have; the
+# offsets below match the layout emitted here.
 {
     echo ">chr_big"
-    head -c 2000 /dev/zero | tr '\0' 'A'
+    head -c 2000000 /dev/zero | tr '\0' 'A'
     echo
     echo ">chr_mid"
-    head -c 1500 /dev/zero | tr '\0' 'C'
+    head -c 1500000 /dev/zero | tr '\0' 'C'
     echo
     echo ">chr_small"
-    head -c 500 /dev/zero | tr '\0' 'G'
+    head -c 500000 /dev/zero | tr '\0' 'G'
     echo
 } > ref/ref.fa
 
 # name, length, offset, linebases, linewidth
 {
-    printf 'chr_big\t2000\t9\t2000\t2001\n'
-    printf 'chr_mid\t1500\t2019\t1500\t1501\n'
-    printf 'chr_small\t500\t3529\t500\t501\n'
+    printf 'chr_big\t2000000\t9\t2000000\t2000001\n'
+    printf 'chr_mid\t1500000\t2000019\t1500000\t1500001\n'
+    printf 'chr_small\t500000\t3500031\t500000\t500001\n'
 } > ref/ref.fa.fai
 
 # angsd treats an index with the same mtime as the fasta as stale, so make sure
