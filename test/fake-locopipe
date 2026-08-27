@@ -71,11 +71,16 @@ case "$SUBCMD" in
             [ -r "$s" ] || { echo "Error: Alignment file ${s} does not have user read permission." >&2 ; exit 1 ; }
         done
 
-        # upstream writes docs/, locopipe.yaml, and workflow/ next to the project
-        mkdir -p "${OUT}/docs" workflow/pipelines
+        # upstream writes docs/ under the output, and workflow/ into the CURRENT
+        # directory, recording scriptdir as an absolute path to it. Laying the
+        # tree out beside the project and moving it afterwards leaves that path
+        # dangling, which is a real bug this reproduces.
+        mkdir -p "${OUT}/docs" workflow/pipelines workflow/scripts
         printf 'sample_name\tbam\tpopulation\nplaceholder\t/dev/null\tgroupname\n' > "${OUT}/docs/samples.tsv"
         printf 'placeholder_contig\t1\n' > "${OUT}/docs/contigs.tsv"
-        printf 'global:\n  basedir: %s\n  reference: %s\n' "$PWD/$OUT" "$REF" > "${OUT}/locopipe.yaml"
+        : > workflow/scripts/get_depth_filter.R
+        printf 'global:\n  basedir: %s\n  reference: %s\n  scriptdir: %s\n' \
+            "$(cd "$OUT" && pwd)" "$REF" "$PWD/workflow/scripts" > "${OUT}/locopipe.yaml"
         cat > workflow/config.yaml <<'YAML'
 directory: .
 software-deployment-method: conda
@@ -120,6 +125,15 @@ YAML
             echo "fake-locopipe: workflow/config.yaml still asks snakemake to build conda envs" >&2
             exit 1
         fi
+
+        # The rules invoke Rscript $scriptdir/<name>.R by the absolute path
+        # recorded at init time. If the tree moved afterwards, snakemake fails
+        # partway through with "cannot open file", so check it up front.
+        SCRIPTDIR=$(sed -n 's/^ *scriptdir: *//p' "${DIR}/locopipe.yaml" | head -1)
+        [ -n "$SCRIPTDIR" ] || { echo "fake-locopipe: no scriptdir in ${DIR}/locopipe.yaml" >&2 ; exit 1 ; }
+        [ -f "${SCRIPTDIR}/get_depth_filter.R" ] || {
+            echo "fake-locopipe: scriptdir recorded in locopipe.yaml does not hold the R scripts: ${SCRIPTDIR}" >&2
+            exit 1 ; }
 
         if [ -n "${CI_CAPTURE:-}" ] ; then
             mkdir -p "$CI_CAPTURE"

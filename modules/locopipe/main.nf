@@ -58,30 +58,37 @@ process PREPARE_PROJECT {
     ${onPath}
     ${TASK_HOME}
 
-    # init lays out docs/, locopipe.yaml and the workflow/ tree. It takes the bam
-    # files themselves ( not the reference ) as its positional argument, and
-    # checks each one exists and is readable, which also proves the container can
-    # see them. Its samples.tsv is overwritten below, since init assigns every
-    # sample to a single group.
-    loco-pipe init -o ${project} -r ${refpath} ${bams} > init.log 2>&1 || {
-        cat init.log ; exit 1 ; }
+    # init is run from inside the project rather than beside it. It writes
+    # workflow/ into the current directory and records scriptdir as an ABSOLUTE
+    # path to it in locopipe.yaml, so laying it out anywhere else and moving it
+    # afterwards leaves that path dangling:
+    #   Fatal error: cannot open file '.../workflow/scripts/get_depth_filter.R'
+    # Running from within the project puts the tree, the tables and the recorded
+    # paths in one place, and `loco-pipe start` then finds workflow/ beside it.
+    mkdir -p ${project}
+    cd ${project}
+
+    # init takes the bam files themselves ( not the reference ) as its
+    # positional argument, and checks each one exists and is readable, which
+    # also proves the container can see them. Its samples.tsv is overwritten
+    # below, since init assigns every sample to a single group.
+    loco-pipe init -o . -r ${refpath} ${bams} > ../init.log 2>&1 || {
+        cat ../init.log ; exit 1 ; }
 
     # the two tables the sheet actually determines
-    cat > ${project}/docs/samples.tsv <<'SAMPLES_TSV'
+    cat > docs/samples.tsv <<'SAMPLES_TSV'
 ${samples}
 SAMPLES_TSV
 
-    cat > ${project}/docs/contigs.tsv <<'CONTIGS_TSV'
+    cat > docs/contigs.tsv <<'CONTIGS_TSV'
 ${contigs}
 CONTIGS_TSV
 
     # Snakemake would otherwise rebuild every conda env at run time and ignore
-    # the image entirely.
+    # the image entirely. Edits workflow/config.yaml, which is now beside us.
     loco-pipe-local
 
-    # init writes workflow/ next to the project, and `loco-pipe start` resolves
-    # it relative to the launch dir, so it has to travel with the project
-    mv workflow ${project}/workflow
+    cd ..
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
