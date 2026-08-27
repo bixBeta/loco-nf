@@ -1,7 +1,7 @@
 nextflow.enable.dsl=2
 
-// Project Params:
-params.sheet            = "sample-sheet.csv"
+// --sheet and --ref are declared in nextflow.config, since the bind
+// computation there reads them while the config is parsed.
 
 // Module Params:
 params.help             = false
@@ -9,7 +9,6 @@ params.listContigs      = false
 
 // Default Params:
 params.id               = "TREX_ID"
-params.ref              = null
 params.contigs          = null
 params.project          = "locopipe"
 params.launch           = true
