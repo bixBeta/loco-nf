@@ -1,0 +1,15 @@
+# Runtime env for Snakemake itself and the `loco-pipe` CLI.
+# Versions follow pyproject.toml's dependency constraints.
+name: locopipe
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - snakemake>=9.0
+  - numpy>=2.4.2
+  - pandas>=3.0.1
+  - graphviz>=14.1.2
+  - click>8.0
+  - pyyaml
+  - pip

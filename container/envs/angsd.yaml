@@ -1,0 +1,9 @@
+# Merge of workflow/envs/angsd.yaml and workflow/envs/samtools.yaml.
+# Provides angsd, realSFS and thetaStat (angsd) plus samtools.
+name: angsd
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - angsd==0.940
+  - samtools==1.16.1

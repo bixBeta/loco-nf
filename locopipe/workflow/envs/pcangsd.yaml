@@ -1,0 +1,6 @@
+name: pcangsd_lcpipe
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - pcangsd==1.36.4

@@ -1,0 +1,49 @@
+#!/opt/conda/envs/locopipe/bin/python
+"""Point a loco-pipe project at the tools already inside this image.
+
+`loco-pipe init` writes a Snakemake profile with
+``software-deployment-method: conda``, which makes Snakemake build the
+workflow's conda envs from scratch at run time. Everything those envs contain
+is already on PATH here, so this strips the conda deployment keys out of the
+generated profile.
+
+Run it once, from the directory you ran `loco-pipe init` in:
+
+    loco-pipe-local            # fixes ./workflow/config.yaml
+    loco-pipe-local path/to/workflow/config.yaml
+"""
+import sys
+from pathlib import Path
+
+import yaml
+
+CONDA_KEYS = ("software-deployment-method", "conda-cleanup-pkgs", "use-conda")
+
+
+def main() -> int:
+    target = Path(sys.argv[1] if len(sys.argv) > 1 else "workflow/config.yaml")
+    if not target.is_file():
+        print(
+            f"error: {target} not found. Run this from the directory you ran "
+            "`loco-pipe init` in, or pass the path to workflow/config.yaml.",
+            file=sys.stderr,
+        )
+        return 1
+
+    profile = yaml.safe_load(target.read_text()) or {}
+    removed = [k for k in CONDA_KEYS if k in profile]
+    for key in removed:
+        del profile[key]
+
+    if not removed:
+        print(f"{target}: already set up to use the container's tools")
+        return 0
+
+    target.write_text(yaml.dump(profile, sort_keys=False))
+    print(f"{target}: removed {', '.join(removed)}")
+    print("loco-pipe will now use the tools baked into this image.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

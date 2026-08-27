@@ -1,0 +1,43 @@
+#!/bin/bash
+# Verify that everything loco-pipe shells out to is present in this image.
+set -uo pipefail
+
+fail=0
+ok()   { printf '  ok    %-14s %s\n' "$1" "$2"; }
+bad()  { printf '  MISS  %-14s %s\n' "$1" "$2"; fail=1; }
+
+echo "binaries"
+for b in snakemake loco-pipe python Rscript R angsd realSFS thetaStat \
+         samtools pcangsd convert qpas dot; do
+  p=$(command -v "$b" 2>/dev/null)
+  if [[ -n $p ]]; then ok "$b" "$p"; else bad "$b" "not on PATH"; fi
+done
+
+# ohana and ImageMagick both ship a `convert`; make sure we resolved to ohana's.
+if command -v convert >/dev/null 2>&1; then
+  if [[ $(command -v convert) != *"/envs/ohana/"* ]]; then
+    bad "convert" "resolves to $(command -v convert), not ohana's"
+  fi
+fi
+
+echo "python modules"
+for m in snakemake pandas numpy yaml click locopipe; do
+  if python -c "import $m" 2>/dev/null; then ok "$m" "importable"; else bad "$m" "import failed"; fi
+done
+
+echo "R packages"
+for pkg in tidyverse cowplot ggplot2 dplyr fitdistrplus extraDistr \
+           data.table RSpectra Matrix survival MASS lostruct; do
+  if Rscript --vanilla -e "suppressMessages(library($pkg))" >/dev/null 2>&1; then
+    ok "$pkg" "loads"
+  else
+    bad "$pkg" "library($pkg) failed"
+  fi
+done
+
+if [[ $fail -eq 0 ]]; then
+  echo "all dependencies present"
+else
+  echo "MISSING DEPENDENCIES - see above" >&2
+fi
+exit $fail

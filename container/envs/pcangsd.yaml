@@ -1,0 +1,7 @@
+# Mirrors workflow/envs/pcangsd.yaml
+name: pcangsd
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - pcangsd==1.36.4

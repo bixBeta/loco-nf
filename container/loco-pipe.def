@@ -1,0 +1,104 @@
+# Standalone Apptainer/Singularity definition for loco-pipe.
+#
+# Use this to build the image directly on a cluster (no Docker needed):
+#
+#   apptainer build --fakeroot loco-pipe.sif container/loco-pipe.def
+#
+# It must be run from the repository root, because %files copies the loco-pipe
+# source into the image. ohana is only published for linux-64, so this image is
+# x86_64 only.
+#
+# If your site does not allow --fakeroot, build the Docker image on a machine
+# you control and convert it instead - see container/README.md.
+
+Bootstrap: docker
+From: condaforge/miniforge3@sha256:609d8012d8ad3ea46c8e531ce2de9e727031960067b3a1e412c6e2954ef551c9
+
+%files
+    # Not /tmp: Apptainer bind-mounts the host's /tmp over the container's
+    # during %post, which would hide anything staged there.
+    container/envs            /opt/envs
+    container/loco-pipe-check /usr/local/bin/loco-pipe-check
+    container/loco-pipe-local /usr/local/bin/loco-pipe-local
+    # Listed file by file rather than copying the whole tree: %files honours no
+    # ignore list, so `.` would drag in .git and any *.sif sitting in the repo
+    # (which silently doubled the image size).
+    locopipe                  /opt/loco-pipe-src/locopipe
+    toyfish                   /opt/loco-pipe-src/toyfish
+    pyproject.toml            /opt/loco-pipe-src/pyproject.toml
+    README.md                 /opt/loco-pipe-src/README.md
+    LICENSE                   /opt/loco-pipe-src/LICENSE
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export CONDA_DIR=/opt/conda
+
+    # procps (ps) is used by Snakemake for resource accounting.
+    apt-get update
+    apt-get install -y --no-install-recommends procps ca-certificates curl gzip tar
+    rm -rf /var/lib/apt/lists/*
+
+    # One env per tool stack, mirroring the workflow's conda envs, so that
+    # R 4.2, Snakemake's Python 3.11 and pcangsd's Python cannot conflict.
+    for env in angsd pcangsd ohana locopipe r; do
+        conda env create -n "$env" -f "/opt/envs/${env}.yaml"
+    done
+    conda clean -afy
+
+    # lostruct is not on conda; the pipeline README pins this exact commit.
+    # Fetched from codeload rather than via devtools::install_github, which goes
+    # through api.github.com and fails against its unauthenticated rate limit.
+    # lostruct is pure R (no src/), so R CMD INSTALL needs no compiler.
+    # Staged under /opt, not /tmp, which Apptainer bind-mounts during %post.
+    LOSTRUCT_REF=93ad59309151e44d2d3d0d7748cdc92f6121f564
+    curl -sSL --retry 5 --retry-delay 3 \
+        -o /opt/lostruct.tar.gz \
+        "https://codeload.github.com/petrelharp/local_pca/tar.gz/$LOSTRUCT_REF"
+    mkdir -p /opt/lostruct-src
+    tar xzf /opt/lostruct.tar.gz -C /opt/lostruct-src --strip-components=1
+    "$CONDA_DIR/envs/r/bin/R" CMD INSTALL \
+        --library="$CONDA_DIR/envs/r/lib/R/library" /opt/lostruct-src/lostruct
+    rm -rf /opt/lostruct.tar.gz /opt/lostruct-src
+    "$CONDA_DIR/envs/r/bin/Rscript" --vanilla -e "library(lostruct); cat('lostruct OK\n')"
+
+    # The loco-pipe CLI and the workflow files it copies out on `loco-pipe init`.
+    # --no-deps because conda already installed every runtime dependency, and
+    # because pyproject.toml's `graphviz>=14.1.2` is unsatisfiable from PyPI:
+    # that is the system Graphviz version, while PyPI's `graphviz` bindings
+    # stop at 0.21. The CLI never imports graphviz - Snakemake only needs the
+    # `dot` binary, which the conda graphviz package provides.
+    "$CONDA_DIR/envs/locopipe/bin/pip" install --no-cache-dir --no-deps /opt/loco-pipe-src
+
+    chmod +x /usr/local/bin/loco-pipe-check /usr/local/bin/loco-pipe-local
+    rm -rf /opt/envs
+
+%environment
+    # Order matters. locopipe first so that `python` is Snakemake's interpreter
+    # rather than the one r-essentials drags in; ohana last since nothing else
+    # provides `convert` or `qpas`.
+    export PATH=/opt/conda/envs/locopipe/bin:/opt/conda/envs/r/bin:/opt/conda/envs/angsd/bin:/opt/conda/envs/pcangsd/bin:/opt/conda/envs/ohana/bin:/opt/conda/bin:/usr/local/bin:/usr/bin:/bin
+    # Keep R and Snakemake from writing into the read-only image.
+    export R_LIBS_USER=/tmp/R-libs
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    export PYTHONDONTWRITEBYTECODE=1
+
+%test
+    /usr/local/bin/loco-pipe-check
+
+%runscript
+    exec "$@"
+
+%labels
+    Name loco-pipe
+    Source https://github.com/pdimens/loco-pipe
+
+%help
+    loco-pipe with every dependency baked in: angsd (with realSFS and
+    thetaStat), samtools, pcangsd, ohana (convert/qpas), Snakemake, the
+    loco-pipe CLI, and R 4.2 with tidyverse, cowplot, fitdistrplus,
+    extraDistr, data.table, RSpectra and lostruct.
+
+    Run `loco-pipe-check` inside the image to verify all of it is present.
+    See container/README.md for how to run the pipeline against this image.

@@ -1,0 +1,10 @@
+# Mirrors workflow/envs/ohana.yaml
+# Provides ohana's `convert` (bgl2lgm) and `qpas` binaries.
+# NOTE: ohana's `convert` is unrelated to ImageMagick's `convert`; do not add
+# ImageMagick to this image or it will shadow the binary the workflow calls.
+name: ohana
+channels:
+  - imperial-college-research-computing
+  - conda-forge
+dependencies:
+  - ohana==0.1

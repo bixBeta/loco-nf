@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools_scm[toml]>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "locopipe"
+version = "0.1"
+authors = [{name = "Nicolas Lau"}]
+description = "An automated Snakemake pipeline that streamlines a set of essential population genomic analyses for low-coverage whole genome sequencing (lcWGS) data."
+requires-python = ">=3.11"
+readme = {file = "README.md", content-type = "text/markdown"}
+license = "GPL-3.0-or-later"
+dependencies = [
+    'click>8.0',
+    'snakemake>=9.0',
+    'numpy>=2.4.2',
+    'pandas>=3.0.1',
+    'graphviz>=14.1.2'
+]
+
+[project.scripts]
+loco-pipe = "locopipe.__init__:cli"
+
+
+[project.urls]
+Homepage = "https://github.com/sudmantlab/loco-pipe"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["test/*", ".deprecated/*", "resources/*", ".github/*"]
+
+[tool.setuptools.package-data]
+locopipe = ["**/*"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+locopipe = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+numpy = ">=2.4.2,<3"
+pandas = ">=3.0.1,<4"
+graphviz = ">=14.1.2,<15"
