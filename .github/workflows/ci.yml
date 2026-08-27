@@ -187,6 +187,24 @@ jobs:
           grep -qx -- '2' "$CI_CAPTURE/start.command.txt" || fail "-@ did not match task.cpus"
           echo "table generation OK"
 
+      # A relative bam path validates fine at launch but would be unusable from
+      # a task working directory, so it has to be absolute in samples.tsv.
+      - name: Relative bam paths are made absolute
+        env:
+          CI_CAPTURE: ${{ github.workspace }}/ci-capture-relpath
+        run: |
+          set -euo pipefail
+          rm -rf "$CI_CAPTURE" locopipe
+          { echo "sample,bam,group"
+            echo "S1,test/bams/S1.bam,alpha"
+            echo "S2,test/bams/S2.bam,beta"; } > test/sample-sheet-relative.csv
+          nextflow run . -c test/ci.config \
+            --sheet test/sample-sheet-relative.csv --ref "$PWD/test/ref/ref.fa" \
+            --locopipebin "$PWD/test/bin/loco-pipe" --threads 2
+          grep -qx "$(printf 'S1\t%s/test/bams/S1.bam\talpha' "$PWD")" "$CI_CAPTURE/samples.tsv" \
+            || { cat "$CI_CAPTURE/samples.tsv"; echo "bam path not absolute"; exit 1; }
+          echo "relative paths resolved"
+
       - name: An explicit contig list wins over minlen
         env:
           CI_CAPTURE: ${{ github.workspace }}/ci-capture-contigs

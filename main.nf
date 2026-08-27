@@ -245,6 +245,12 @@ def readSheet() {
         if( !workflow.stubRun && !file(row.bam).exists() )
             error "sample-sheet: ${row.sample}: no bam at ${row.bam}"
 
+        // A relative path resolves against the launch dir here, so it would
+        // validate cleanly and then be written verbatim into samples.tsv, where
+        // angsd reads it from a different working directory and fails. Store
+        // what loco-pipe will actually be able to open.
+        row.bam = file(row.bam).toAbsolutePath().normalize().toString()
+
         rows << row
     }
 
