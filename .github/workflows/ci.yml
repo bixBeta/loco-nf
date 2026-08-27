@@ -268,3 +268,4 @@ jobs:
           bash -n containers/toy-test.sh
           bash -n test/make_test_data.sh
           bash -n test/fake-locopipe
+          bash -n toyfish/make-sheet.sh
