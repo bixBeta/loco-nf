@@ -1,9 +1,13 @@
 // loco-pipe is driven through its own CLI inside the image, so this module is
 // deliberately thin: it lets `loco-pipe init` lay out the project ( which is
 // what keeps us in step with upstream ), then replaces only the two tables the
-// operator actually controls.
+// operator actually controls, and hands off.
+//
+// Preparing and running are ONE process. Splitting them meant the second task
+// reached the first task's directory through a staged symlink, which is what
+// broke `..` resolution, the recorded scriptdir, and publishing. loco-pipe owns
+// a single directory and works in place; the module now matches that.
 
-project      = params.project
 threads      = params.threads
 
 // --locopipebin points at a loco-pipe binary on the host; loco-pipe-local ships
@@ -27,18 +31,17 @@ mkdir -p "\$XDG_CACHE_HOME"
 '''.trim()
 
 
-process PREPARE_PROJECT {
+process LOCOPIPE {
 
     tag "$pin"
 
-    label 'process_low'
+    // cpus / memory come from --threads and --mem, see nextflow.config
 
-    // Only published when stopping here. Otherwise LOCOPIPE_RUN writes into
-    // this same directory and publishes the finished version; publishing both
-    // would race for one name in the launch dir and leave the operator looking
-    // at a copy taken before the analysis ran.
-    publishDir "."            , mode: "copy", overwrite: true, enabled: !params.launch, pattern: "${params.project}"
+    // Only the small artefacts are published. The results themselves are
+    // written straight into --outdir and never copied: they are large, and
+    // moving them out of the directory snakemake tracks would break its resume.
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "versions.yml"
+    publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "locopipe.log"
 
     input:
         val   pin
@@ -46,34 +49,35 @@ process PREPARE_PROJECT {
         val   contigs
         val   bams
         val   refpath
+        val   outdir
         path  ref
         path  fai
 
     output:
-        path "${project}"      , emit: project
-        path "versions.yml"    , emit: versions
+        path "versions.yml"  , emit: versions
+        path "locopipe.log"  , emit: log, optional: true
 
     script:
     """
     ${onPath}
     ${TASK_HOME}
 
-    # init is run from inside the project rather than beside it. It writes
-    # workflow/ into the current directory and records scriptdir as an ABSOLUTE
-    # path to it in locopipe.yaml, so laying it out anywhere else and moving it
-    # afterwards leaves that path dangling:
+    task_dir=\$PWD
+
+    # init is run from inside the project. It writes workflow/ into the current
+    # directory and records scriptdir as an ABSOLUTE path to it in
+    # locopipe.yaml, so laying it out anywhere else and moving it afterwards
+    # leaves that path dangling:
     #   Fatal error: cannot open file '.../workflow/scripts/get_depth_filter.R'
-    # Running from within the project puts the tree, the tables and the recorded
-    # paths in one place, and `loco-pipe start` then finds workflow/ beside it.
-    mkdir -p ${project}
-    cd ${project}
+    mkdir -p ${outdir}
+    cd ${outdir}
 
     # init takes the bam files themselves ( not the reference ) as its
     # positional argument, and checks each one exists and is readable, which
     # also proves the container can see them. Its samples.tsv is overwritten
     # below, since init assigns every sample to a single group.
-    loco-pipe init -o . -r ${refpath} ${bams} > ../init.log 2>&1 || {
-        cat ../init.log ; exit 1 ; }
+    loco-pipe init -o . -r ${refpath} ${bams} > "\$task_dir/init.log" 2>&1 || {
+        cat "\$task_dir/init.log" ; exit 1 ; }
 
     # the two tables the sheet actually determines
     cat > docs/samples.tsv <<'SAMPLES_TSV'
@@ -88,68 +92,28 @@ CONTIGS_TSV
     # the image entirely. Edits workflow/config.yaml, which is now beside us.
     loco-pipe-local
 
-    cd ..
-
-    cat <<-END_VERSIONS > versions.yml
+    cat <<-END_VERSIONS > "\$task_dir/versions.yml"
     "${task.process}":
         loco-pipe: \$(loco-pipe --help > /dev/null 2>&1 && echo "0.1")
         snakemake: \$(snakemake --version)
         angsd: \$(angsd 2>&1 | grep -m1 -oE 'version: [^ ]+' | sed 's/version: //')
     END_VERSIONS
-    """
 
-    stub:
-    """
-    mkdir -p ${project}/docs ${project}/workflow
-    printf '%s\\n' "${samples}" > ${project}/docs/samples.tsv
-    printf '%s\\n' "${contigs}" > ${project}/docs/contigs.tsv
-    touch ${project}/locopipe.yaml
-    touch versions.yml
-    """
-}
-
-
-process LOCOPIPE_RUN {
-
-    tag "$project"
-
-    // cpus / memory come from --threads and --mem, see nextflow.config
-
-    // symlinked rather than copied: loco-pipe writes a lot, and it is already
-    // on the shared filesystem
-    publishDir "."          , mode: "symlink", overwrite: true, pattern: "${params.project}"
-
-    input:
-        path project
-
-    output:
-        path "${project}"                    , emit: project
-        path "${project}/figures"            , emit: figures, optional: true
-        path "locopipe.log"                  , emit: log
-
-    script:
-    """
-    ${onPath}
-    ${TASK_HOME}
-
-    # The project arrives as a symlink, so `cd` into it lands in the real
-    # directory and `..` would resolve to ITS parent, not the task dir. Every
-    # path out of the project has to be absolute.
-    task_dir=\$PWD
-    log=\$task_dir/locopipe.log
-
-    cd ${project}
+    if [ "${params.launch}" != "true" ] ; then
+        echo "prepared ${outdir} but did not launch it ( --launch false )"
+        exit 0
+    fi
 
     # -@ matches what Nextflow reserved, so snakemake cannot oversubscribe the
-    # allocation it was given
+    # allocation it was given. Run from inside the project so it finds workflow/.
+    log=\$task_dir/locopipe.log
     loco-pipe start -@ ${task.cpus} . 2>&1 | tee "\$log"
 
     # `loco-pipe start` calls subprocess.run without checking the return code,
     # so it exits 0 even when the workflow failed. Its log is the only reliable
     # signal, and without this a failed run looks like a successful one.
-    cd "\$task_dir"
     if grep -qE 'WorkflowError|command exited with non-zero|MissingInputException|Error in rule|^Error' "\$log" ; then
-        echo "loco-pipe reported a failure, see locopipe.log" >&2
+        echo "loco-pipe reported a failure, see pipeline_info/locopipe.log" >&2
         tail -40 "\$log" >&2
         exit 1
     fi
@@ -157,7 +121,7 @@ process LOCOPIPE_RUN {
     # A run that does nothing at all is a failure too: snakemake can exit
     # cleanly with an empty DAG, and loco-pipe start returns 0 either way, so
     # without this the pipeline reports success having produced no results.
-    if [ ! -d "${project}/figures" ] ; then
+    if [ ! -d figures ] ; then
         echo "loco-pipe produced no figures directory - it did no work." >&2
         echo "Its log follows:" >&2
         tail -40 "\$log" >&2
@@ -167,7 +131,11 @@ process LOCOPIPE_RUN {
 
     stub:
     """
-    mkdir -p ${project}/figures
+    mkdir -p ${outdir}/docs ${outdir}/figures ${outdir}/workflow
+    printf '%s\\n' "${samples}" > ${outdir}/docs/samples.tsv
+    printf '%s\\n' "${contigs}" > ${outdir}/docs/contigs.tsv
+    touch ${outdir}/locopipe.yaml
+    touch versions.yml
     echo "stub" > locopipe.log
     """
 }

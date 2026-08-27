@@ -89,9 +89,15 @@ line overrides it. A few things worth knowing:
   run that quietly analyses nothing.
 - **`--launch false`** stops after writing the tables. The grouping drives
   most of the analyses, so this is the point to check
-  `<project>/docs/samples.tsv` before committing to a long run.
+  `<outdir>/docs/samples.tsv` before committing to a long run. Re-running with
+  `--launch true` continues in the same directory rather than starting over.
+- **`--outdir`** (default `locopipe`) is loco-pipe's own directory,
+  deliberately outside Nextflow's `work/`. snakemake keeps its state there, so
+  a failed run resumes at the rule it stopped at, and results survive
+  `nextflow clean`. Nextflow does not track its contents: if you delete it but
+  keep `work/`, a `-resume` run will skip the task and produce nothing.
 - **Analysis settings stay loco-pipe’s.** The front-end does not touch them;
-  edit the generated `<project>/locopipe.yaml` for SNP calling thresholds,
+  edit the generated `<outdir>/locopipe.yaml` for SNP calling thresholds,
   depth filters, window sizes and which modules run.
 
 `nextflow run bixBeta/loco-nf -r main --help` documents every argument and the

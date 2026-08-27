@@ -323,10 +323,26 @@ jobs:
           rc=$?
           set -e
           if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
-          echo "$out" | grep -q 'did not launch it' || { echo "$out" | tail -20; exit 1; }
-          test -f locopipe/docs/samples.tsv
-          echo "$out" | grep -q 'LOCOPIPE_RUN' && { echo "LOCOPIPE_RUN ran anyway"; exit 1; }
+          echo "$out" | grep -q 'without launching it' || { echo "$out" | tail -20; exit 1; }
+          # the tables are written, so the grouping can be checked ...
+          test -f locopipe/docs/samples.tsv || { echo "no samples.tsv"; exit 1; }
+          test -f locopipe/locopipe.yaml    || { echo "no locopipe.yaml"; exit 1; }
+          # ... but nothing was analysed
+          if [ -d locopipe/figures ] ; then echo "loco-pipe ran despite --launch false"; exit 1 ; fi
           echo "launch gate OK"
+
+      # snakemake keeps its state in --outdir, which is the point of putting it
+      # outside work/: a second run continues rather than starting over.
+      - name: A prepared outdir is reused on the next run
+        run: |
+          set -euo pipefail
+          # carries on from the --launch false run above, same outdir
+          test -d locopipe
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --threads 2 --launch true
+          test -d locopipe/figures || { echo "second run did not analyse"; exit 1; }
+          echo "outdir reuse OK"
 
       # The bug this guards against: `loco-pipe start` exits 0 even when the
       # workflow failed, so without the log check a failed run looks successful.

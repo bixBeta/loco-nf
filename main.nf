@@ -10,7 +10,6 @@ params.listContigs      = false
 // Default Params:
 params.id               = "TREX_ID"
 params.contigs          = null
-params.project          = "locopipe"
 params.launch           = true
 params.minlen           = 1000000
 
@@ -48,7 +47,9 @@ Args:
     * --sheet        : sample-sheet.csv < default: looks for sample-sheet.csv in the project dir >
     * --ref          : full path to the reference genome fasta ( must be indexed, .fai alongside )
     * --sif          : full path to the loco-pipe image < default: --sifdir/loco-pipe.sif >
-    * --project      : name of the directory loco-pipe writes into < default: locopipe >
+    * --outdir       : directory loco-pipe writes results into < default: locopipe >
+                       It lives outside nextflow's work dir, so snakemake keeps
+                       its state there and a failed run resumes where it stopped.
     * --threads      : cores handed to snakemake < default: 32 >
     * --launch       : run loco-pipe after preparing < default: true >
                        --launch false stops after writing the tables, so the
@@ -113,7 +114,7 @@ trexID       : ${params.id}
 sheet        : ${params.sheet}
 ref          : ${params.ref}
 contigs      : ${params.contigs ?: "auto, every contig >= ${params.minlen} bp"}
-project      : ${params.project}
+outdir       : ${file(params.outdir).toAbsolutePath().normalize()}
 launch       : ${params.launch}
 threads      : ${params.threads}
 maxforks     : ${params.maxforks}
@@ -257,18 +258,17 @@ def readSheet() {
     if( !workflow.stubRun ) {
         def groups = rows.collect { it.group }.unique().sort()
         if( groups.size() < 2 )
-            log.warn "sample-sheet: every sample is in group '${groups[0]}'. Analyses that compare groups will have nothing to compare; turn the population level modules off in ${params.project}/locopipe.yaml."
+            log.warn "sample-sheet: every sample is in group '${groups[0]}'. Analyses that compare groups will have nothing to compare; turn the population level modules off in ${params.outdir}/locopipe.yaml."
     }
 
     return rows
 }
 
 
-include {   PREPARE_PROJECT   } from './modules/locopipe'
-include {   LOCOPIPE_RUN      } from './modules/locopipe'
+include {   LOCOPIPE   } from './modules/locopipe'
 
 
-workflow LOCOPIPE {
+workflow RUN {
 
     def rows = readSheet()
 
@@ -310,26 +310,26 @@ workflow LOCOPIPE {
     ch_contigs = channel.value(contigs)
     ch_bams    = channel.value(bamlist)
 
-    // init records the reference path into locopipe.yaml, and loco-pipe reads it
-    // from a different task later. Give it the real location rather than the
-    // staged symlink in this task's directory, which points into the launcher's
-    // resolved filesystem and is not reachable from the next task.
+    // init records the reference path into locopipe.yaml, which snakemake reads
+    // from inside the results directory. Give it the real location rather than
+    // the staged symlink in the task directory, which points into the
+    // launcher's resolved filesystem.
     def refpath = file(params.ref).toAbsolutePath().normalize().toString()
 
-    PREPARE_PROJECT( ch_pin, ch_samples, ch_contigs, ch_bams, channel.value(refpath),
-                     file(params.ref), file("${params.ref}.fai") )
+    // Absolute, because loco-pipe is run with this as its working directory and
+    // records absolute paths into locopipe.yaml.
+    def outdir = file(params.outdir).toAbsolutePath().normalize().toString()
 
-    if( params.launch ) {
+    LOCOPIPE( ch_pin, ch_samples, ch_contigs, ch_bams, channel.value(refpath),
+              channel.value(outdir), file(params.ref), file("${params.ref}.fai") )
 
-        LOCOPIPE_RUN( PREPARE_PROJECT.out.project )
-    }
-    else {
+    if( !params.launch ) {
 
         log.info """
-Prepared ${params.project} but did not launch it ( --launch false ).
-Check the grouping in ${params.project}/docs/samples.tsv, then run:
-
-    nextflow run bixBeta/loco-nf -r main -params-file params.yaml --launch true
+Preparing ${outdir} without launching it ( --launch false ).
+Check the grouping in ${outdir}/docs/samples.tsv, then run the same command
+again with --launch true. snakemake keeps its state in that directory, so
+nothing already done is repeated.
 """
     }
 }
@@ -337,5 +337,5 @@ Check the grouping in ${params.project}/docs/samples.tsv, then run:
 
 workflow {
 
-    LOCOPIPE()
+    RUN()
 }

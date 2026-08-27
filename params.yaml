@@ -11,13 +11,13 @@
 #
 #  This is a front-end for loco-pipe. It writes the two tables loco-pipe reads
 #  and then runs it; the analyses themselves are configured in the generated
-#  <project>/locopipe.yaml.
+#  <outdir>/locopipe.yaml.
 # =============================================================================
 
 # ---- project ----------------------------------------------------------------
 id:            TREX_ID                # project id, appears in the banner
 sheet:         sample-sheet.csv       # see --help for the columns
-project:       locopipe               # directory loco-pipe writes into
+outdir:        locopipe               # directory loco-pipe writes results into
 
 # ---- reference --------------------------------------------------------------
 # Full path to the reference fasta. It must be indexed: a .fai is expected
