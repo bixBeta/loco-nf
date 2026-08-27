@@ -7,18 +7,26 @@
 # placeholders, so it cannot be used as-is; this writes the same samples with
 # absolute paths and the columns loco-nf expects.
 #
+# The sheet is written to the directory you run this from, not next to the
+# script, so it works when the repo lives somewhere read-only-ish like
+# ~/.nextflow/assets after a `nextflow pull`. The bam paths inside always point
+# back at the toyfish data beside the script.
+#
 # Samples are grouped by the "species" column ( sunset / vermilion ), which is
-# what upstream's config used. The "population" column splits vermilion three
-# ways as well, if you would rather exercise more groups.
+# what upstream's config used. GROUP=population splits vermilion three ways as
+# well, if you would rather exercise more groups.
 set -euo pipefail
 
+HERE=$PWD
 cd "$(dirname "$0")/.."
 ROOT=$PWD
-OUT=${1:-$ROOT/toyfish-sheet.csv}
+
+OUT=${1:-toyfish-sheet.csv}
+case "$OUT" in /*) ;; *) OUT="$HERE/$OUT" ;; esac
 GROUP=${GROUP:-species}
 
-TABLE=toyfish/docs/sample_table.tsv
-[ -f "$TABLE" ] || { echo "no $TABLE - are you in the loco-nf repo?" >&2; exit 1; }
+TABLE=$ROOT/toyfish/docs/sample_table.tsv
+[ -f "$TABLE" ] || { echo "no $TABLE - is this a loco-nf checkout?" >&2; exit 1; }
 
 python3 - "$TABLE" "$OUT" "$ROOT" "$GROUP" <<'PY'
 import csv, os, sys
@@ -35,11 +43,25 @@ with open(out, "w", newline="") as fh:
         if not os.path.exists(bam):
             sys.exit(f"missing bam: {bam}")
         w.writerow([r["sample_name"], bam, r[group]])
-print(f"{out}: {len(rows)} samples, grouped by '{group}'")
+groups = sorted({r[group] for r in rows})
+print(f"wrote {out}")
+print(f"  {len(rows)} samples, grouped by '{group}': {', '.join(groups)}")
 PY
 
 # angsd refuses to run when the .fai is not strictly newer than the fasta, and
 # a clone or an rsync easily lands both in the same second.
+REF=$ROOT/toyfish/reference/toy_refgen.fa
 sleep 1
-touch "$ROOT/toyfish/reference/toy_refgen.fa.fai"
-echo "touched toyfish/reference/toy_refgen.fa.fai"
+touch "$REF.fai"
+
+cat <<EOF
+
+Now run, from $HERE:
+
+    nextflow run bixBeta/loco-nf -r main \\
+      --sheet $OUT \\
+      --ref   $REF \\
+      --id    TOYTEST \\
+      --threads 8
+
+EOF
