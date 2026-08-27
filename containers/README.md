@@ -33,7 +33,7 @@ on any x86_64 cluster.
 ### On a cluster that has Apptainer (preferred)
 
 ```bash
-apptainer build --fakeroot loco-pipe.sif container/loco-pipe.def
+apptainer build --fakeroot loco-pipe.sif containers/loco-pipe.def
 ```
 
 Run it from the repository root — the definition copies the loco-pipe source
@@ -45,7 +45,7 @@ Use this when the build host has Docker but no Apptainer. From the repository
 root:
 
 ```bash
-docker build --platform linux/amd64 -f container/Dockerfile -t loco-pipe:latest .
+docker build --platform linux/amd64 -f containers/Dockerfile -t loco-pipe:latest .
 ```
 
 ```bash

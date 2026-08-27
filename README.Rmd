@@ -14,12 +14,53 @@ knitr::opts_chunk$set(echo = TRUE)
 >
 > This is a **containerized version** of [loco-pipe](https://github.com/sudmantlab/loco-pipe),
 > by the [Sudmant Lab](https://github.com/sudmantlab). All of the science and
-> the pipeline itself are their work; this repository only packages the
-> dependencies into a single Apptainer/Singularity image so the pipeline runs
-> without building conda environments at run time.
+> the pipeline itself are their work.
 >
-> The container is documented in [container/README.md](container/README.md).
+> Every Snakemake rule, R script and configuration default is byte-identical to
+> upstream, so results are directly comparable. What this repository adds is
+> packaging: a single Apptainer image holding every dependency, and a Nextflow
+> front-end that builds loco-pipe's input tables from a sample sheet.
+>
 > Please cite the original authors — see [Citation](#citation).
+
+## Running this fork
+
+Two things are added on top of loco-pipe, and they are independent: use the image on its own, or drive it with Nextflow.
+
+### The image
+
+One Apptainer/Singularity image carries angsd, samtools, pcangsd, ohana, Snakemake, and R 4.2 with tidyverse, cowplot, fitdistrplus, extraDistr, data.table, RSpectra and lostruct. Nothing is built at run time.
+
+```bash
+apptainer exec loco-pipe.sif loco-pipe-check
+```
+
+That resolves every binary the workflow calls and loads every R package the scripts use. Build it, or check it after copying it to a new host, following [containers/README.md](containers/README.md).
+
+### The Nextflow front-end
+
+loco-pipe reads two tab separated tables. The front-end writes them from one comma separated sample sheet, validates everything at launch, and hands off:
+
+```bash
+nextflow run bixBeta/loco-nf -r main -params-file params.yaml
+```
+
+| sample      | bam                                | group     |
+|:------------|:-----------------------------------|:----------|
+| ABLG11920-1 | /workdir/proj/bams/ABLG11920-1.bam | sunset    |
+| ABLG11918-1 | /workdir/proj/bams/ABLG11918-1.bam | vermilion |
+
+`params.yaml` ships with every default, commented; anything on the command line overrides it. A few things worth knowing:
+
+- **Contigs come from the reference `.fai`**, not the sheet, filtered by `--minlen` (default 1 Mb). loco-pipe parallelizes by contig, so run `--listContigs` first to see what the reference holds and keep the count under about 100. A `--minlen` that excludes everything is an error, not a run that quietly analyses nothing.
+- **`--launch false`** stops after writing the tables. The grouping drives most of the analyses, so this is the point to check `<project>/docs/samples.tsv` before committing to a long run.
+- **Analysis settings stay loco-pipe's.** The front-end does not touch them; edit the generated `<project>/locopipe.yaml` for SNP calling thresholds, depth filters, window sizes and which modules run.
+
+`nextflow run bixBeta/loco-nf -r main --help` documents every argument and the sample sheet in full.
+
+### One caveat
+
+`loco-pipe start` calls `subprocess.run` without checking the return code, so **it exits 0 even when the workflow failed**. The Nextflow front-end greps the log and fails properly, but if you run loco-pipe directly inside the image, check the log rather than the exit status.
 
 **loco-pipe** is an automated Snakemake pipeline that streamlines a set of essential population genomic analyses for **lo**w-**co**verage whole genome sequencing (lcWGS) data.
 

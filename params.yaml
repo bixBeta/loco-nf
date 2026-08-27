@@ -36,7 +36,7 @@ minlen:        1000000                # bp
 # contigs:     contigs.txt            # one contig per line, optional 2nd column of plot names
 
 # ---- the image --------------------------------------------------------------
-# Built locally with container/build-sif.sh and never pulled.
+# Built locally with containers/build-sif.sh and never pulled.
 sifdir:        /workdir/TREx_shared/software
 # sif:         /workdir/TREx_shared/software/loco-pipe.sif
 

@@ -3,4 +3,4 @@
 **/*.pyc
 *.sif
 *.tar
-container/build
+containers/build

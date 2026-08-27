@@ -198,7 +198,7 @@ def checkInputs() {
         def sif = params.image - "file://"
         if( !file(sif).exists() )
             error """No loco-pipe image at: ${sif}
-    Build it with container/build-sif.sh, or point --sif at an existing one."""
+    Build it with containers/build-sif.sh, or point --sif at an existing one."""
     }
 
     if( !file(params.sheet).exists() )

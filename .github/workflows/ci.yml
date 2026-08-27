@@ -264,7 +264,7 @@ jobs:
       - name: Shell scripts lint
         run: |
           set -euo pipefail
-          bash -n container/build-sif.sh
-          bash -n container/toy-test.sh
+          bash -n containers/build-sif.sh
+          bash -n containers/toy-test.sh
           bash -n test/make_test_data.sh
           bash -n test/fake-locopipe

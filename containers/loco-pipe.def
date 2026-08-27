@@ -2,14 +2,14 @@
 #
 # Use this to build the image directly on a cluster (no Docker needed):
 #
-#   apptainer build --fakeroot loco-pipe.sif container/loco-pipe.def
+#   apptainer build --fakeroot loco-pipe.sif containers/loco-pipe.def
 #
 # It must be run from the repository root, because %files copies the loco-pipe
 # source into the image. ohana is only published for linux-64, so this image is
 # x86_64 only.
 #
 # If your site does not allow --fakeroot, build the Docker image on a machine
-# you control and convert it instead - see container/README.md.
+# you control and convert it instead - see containers/README.md.
 
 Bootstrap: docker
 From: condaforge/miniforge3@sha256:609d8012d8ad3ea46c8e531ce2de9e727031960067b3a1e412c6e2954ef551c9
@@ -17,9 +17,9 @@ From: condaforge/miniforge3@sha256:609d8012d8ad3ea46c8e531ce2de9e727031960067b3a
 %files
     # Not /tmp: Apptainer bind-mounts the host's /tmp over the container's
     # during %post, which would hide anything staged there.
-    container/envs            /opt/envs
-    container/loco-pipe-check /usr/local/bin/loco-pipe-check
-    container/loco-pipe-local /usr/local/bin/loco-pipe-local
+    containers/envs            /opt/envs
+    containers/loco-pipe-check /usr/local/bin/loco-pipe-check
+    containers/loco-pipe-local /usr/local/bin/loco-pipe-local
     # Listed file by file rather than copying the whole tree: %files honours no
     # ignore list, so `.` would drag in .git and any *.sif sitting in the repo
     # (which silently doubled the image size).
@@ -101,4 +101,4 @@ From: condaforge/miniforge3@sha256:609d8012d8ad3ea46c8e531ce2de9e727031960067b3a
     extraDistr, data.table, RSpectra and lostruct.
 
     Run `loco-pipe-check` inside the image to verify all of it is present.
-    See container/README.md for how to run the pipeline against this image.
+    See containers/README.md for how to run the pipeline against this image.

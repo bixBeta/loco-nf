@@ -3,9 +3,9 @@
 # ohana is only published for linux-64, so this image is x86_64 only. Build it
 # from the repository root:
 #
-#   docker build --platform linux/amd64 -f container/Dockerfile -t loco-pipe .
+#   docker build --platform linux/amd64 -f containers/Dockerfile -t loco-pipe .
 #
-# Then convert to Singularity/Apptainer (see container/README.md).
+# Then convert to Singularity/Apptainer (see containers/README.md).
 FROM condaforge/miniforge3@sha256:609d8012d8ad3ea46c8e531ce2de9e727031960067b3a1e412c6e2954ef551c9
 
 LABEL org.opencontainers.image.title="loco-pipe" \
@@ -21,7 +21,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ENV CONDA_DIR=/opt/conda
-COPY container/envs/ /tmp/envs/
+COPY containers/envs/ /tmp/envs/
 
 # One env per tool stack, mirroring the workflow's conda envs. Kept separate so
 # that R 4.2, Snakemake's Python 3.11 and pcangsd's Python cannot conflict.
@@ -69,8 +69,8 @@ ENV R_LIBS_USER=/tmp/R-libs \
     LANG=C.UTF-8 \
     PYTHONDONTWRITEBYTECODE=1
 
-COPY container/loco-pipe-check /usr/local/bin/loco-pipe-check
-COPY container/loco-pipe-local /usr/local/bin/loco-pipe-local
+COPY containers/loco-pipe-check /usr/local/bin/loco-pipe-check
+COPY containers/loco-pipe-local /usr/local/bin/loco-pipe-local
 RUN chmod +x /usr/local/bin/loco-pipe-check /usr/local/bin/loco-pipe-local
 
 CMD ["loco-pipe", "--help"]

@@ -3,10 +3,10 @@
 # (e.g. macOS). Apptainer is run inside a container to do the conversion.
 #
 # Usage, from the repository root:
-#   ./container/build-sif.sh [output.sif]
+#   ./containers/build-sif.sh [output.sif]
 #
 # On a cluster that already has Apptainer, skip this and use:
-#   apptainer build --fakeroot loco-pipe.sif container/loco-pipe.def
+#   apptainer build --fakeroot loco-pipe.sif containers/loco-pipe.def
 set -euo pipefail
 
 OUT=${1:-loco-pipe.sif}
@@ -21,7 +21,7 @@ ROOT=$PWD
 command -v docker >/dev/null || { echo "error: docker not found" >&2; exit 1; }
 
 echo "==> building $IMAGE for $PLATFORM"
-docker build --platform "$PLATFORM" -f container/Dockerfile -t "$IMAGE" .
+docker build --platform "$PLATFORM" -f containers/Dockerfile -t "$IMAGE" .
 
 echo "==> verifying dependencies inside the image"
 docker run --rm --platform "$PLATFORM" "$IMAGE" loco-pipe-check
