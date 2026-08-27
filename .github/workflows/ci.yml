@@ -88,24 +88,32 @@ jobs:
       # The bams are passed to loco-pipe as text, not staged, so autoMounts
       # cannot bind them. Whatever the sheet references has to be bound here or
       # the image cannot read the data.
+      # `nextflow config` takes no pipeline params, so the resolved bind list is
+      # read off the banner of a stub run instead, which is also where an
+      # operator sees it.
       - name: Sheet and reference directories are bound
         run: |
           set -euo pipefail
-          cfg=$(nextflow config . --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa")
-          echo "$cfg" | grep -q -- "-B $PWD/test/bams" || {
-            echo "$cfg" | grep -i runOptions; echo "bam directory not bound"; exit 1; }
-          echo "$cfg" | grep -q -- "-B $PWD/test/ref" || {
-            echo "$cfg" | grep -i runOptions; echo "reference directory not bound"; exit 1; }
+          set +e
+          out=$(nextflow run . -stub-run -c test/ci.config \
+                  --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa" 2>&1)
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
+          binds=$(echo "$out" | grep '^binds' || true)
+          echo "$binds"
+          echo "$binds" | grep -q -- "-B $PWD/test/bams" || { echo "bam directory not bound"; exit 1; }
+          echo "$binds" | grep -q -- "-B $PWD/test/ref"  || { echo "reference directory not bound"; exit 1; }
           # the site defaults must survive
-          echo "$cfg" | grep -q -- '-B /local'   || { echo "/local bind lost"; exit 1; }
-          echo "$cfg" | grep -q -- '-B /workdir' || { echo "/workdir bind lost"; exit 1; }
+          echo "$binds" | grep -q -- '-B /local'   || { echo "/local bind lost"; exit 1; }
+          echo "$binds" | grep -q -- '-B /workdir' || { echo "/workdir bind lost"; exit 1; }
           echo "binds OK"
 
       - name: A missing sheet does not break config parsing
         run: |
           set -euo pipefail
           # --help and first-time runs have no sheet; the bind logic must not throw
-          nextflow config . --sheet /no/such/sheet.csv > /dev/null
+          nextflow run . --help --sheet /no/such/sheet.csv > /dev/null
           nextflow config . > /dev/null
           echo "config parses without a sheet"
 

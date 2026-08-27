@@ -120,6 +120,7 @@ threads      : ${params.threads}
 maxforks     : ${params.maxforks}
 engine       : ${params.engine}
 loco-pipe    : ${params.engine == "local" ? params.locopipebin : params.image}
+binds        : ${params.runbinds}
 """
 
 
