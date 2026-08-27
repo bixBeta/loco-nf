@@ -68,6 +68,30 @@ jobs:
           fi
           echo "sif resolution OK"
 
+      # The bams are passed to loco-pipe as text, not staged, so autoMounts
+      # cannot bind them. Whatever the sheet references has to be bound here or
+      # the image cannot read the data.
+      - name: Sheet and reference directories are bound
+        run: |
+          set -euo pipefail
+          cfg=$(nextflow config . --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa")
+          echo "$cfg" | grep -q -- "-B $PWD/test/bams" || {
+            echo "$cfg" | grep -i runOptions; echo "bam directory not bound"; exit 1; }
+          echo "$cfg" | grep -q -- "-B $PWD/test/ref" || {
+            echo "$cfg" | grep -i runOptions; echo "reference directory not bound"; exit 1; }
+          # the site defaults must survive
+          echo "$cfg" | grep -q -- '-B /local'   || { echo "/local bind lost"; exit 1; }
+          echo "$cfg" | grep -q -- '-B /workdir' || { echo "/workdir bind lost"; exit 1; }
+          echo "binds OK"
+
+      - name: A missing sheet does not break config parsing
+        run: |
+          set -euo pipefail
+          # --help and first-time runs have no sheet; the bind logic must not throw
+          nextflow config . --sheet /no/such/sheet.csv > /dev/null
+          nextflow config . > /dev/null
+          echo "config parses without a sheet"
+
       - name: Help text
         run: nextflow run . --help
 

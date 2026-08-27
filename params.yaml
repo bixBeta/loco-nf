@@ -42,6 +42,11 @@ minlen:        1000000                # bp
 sifdir:        /workdir/TREx_shared/projects
 # sif:         /some/other/place/loco-pipe.sif
 
+# Directories always bound into the image, space separated. The directories your
+# sheet and reference point at are added automatically, so this only needs
+# changing for a site whose data lives somewhere else entirely.
+binds:         /local /workdir
+
 # ---- resources --------------------------------------------------------------
 # threads is handed straight to snakemake as -@ and reserved by nextflow, so the
 # allocation and what snakemake believes it has cannot drift apart.
