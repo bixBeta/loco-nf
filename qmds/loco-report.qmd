@@ -132,9 +132,12 @@ suppressPackageStartupMessages({
 # Every module in loco-pipe can be switched off in locopipe.yaml, so nothing
 # here assumes a file exists. A section that has no figures says so rather than
 # failing the render.
-fig <- function(path, width = "100%") {
+# No width attribute: the CSS above caps oversized figures at the column width
+# while leaving smaller ones at their natural size. Forcing width=100% upscaled
+# ohana's 3cm-wide panel to 1600px and made it a blurry, 3700px-tall sliver.
+fig <- function(path) {
   if (file.exists(path)) {
-    cat(sprintf("![](%s){width=%s}\n\n", path, width))
+    cat(sprintf("![](%s)\n\n", path))
   } else {
     cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
   }
@@ -142,7 +145,7 @@ fig <- function(path, width = "100%") {
 
 # One paginated tabset per collection of per-sample / per-population figures.
 # The navigator above replaces the tab bar, so this only has to emit the panels.
-tabset <- function(paths, labels, width = "100%") {
+tabset <- function(paths, labels) {
   if (length(paths) == 0) {
     cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
     return(invisible(NULL))
@@ -150,7 +153,7 @@ tabset <- function(paths, labels, width = "100%") {
   cat("::: {.panel-tabset}\n\n")
   for (i in seq_along(paths)) {
     cat(paste0("## ", labels[i], "\n\n"))
-    cat(paste0("![](", paths[i], "){width=", width, "}\n\n"))
+    cat(paste0("![](", paths[i], ")\n\n"))
   }
   cat(":::\n\n")
 }
