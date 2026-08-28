@@ -13,14 +13,17 @@ process REPORT {
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "*.html"
 
     input:
-        val id
-        val outdir
+        val  id
+        val  outdir
+        path qmd
 
     output:
         path "*.html", emit: report
 
-    // sartools style: the template is copied in, rendered, and removed, so only
-    // the html is left to publish
+    // The qmd is a staged path input rather than a ${projectDir} reference:
+    // Nextflow binds the directories of declared inputs, but not the pipeline
+    // source, so reading it from projectDir failed inside the container with
+    //   cp: cannot stat '.../qmds/loco-report.qmd': No such file or directory
     script:
     template 'makeReport.sh'
 

@@ -338,7 +338,8 @@ workflow RUN {
     // than on the outdir existing.
     if( params.launch && params.report ) {
 
-        REPORT( ch_pin, LOCOPIPE.out.versions.map { outdir } )
+        REPORT( ch_pin, LOCOPIPE.out.versions.map { outdir },
+                file("${projectDir}/qmds/loco-report.qmd") )
     }
 
     if( !params.launch ) {

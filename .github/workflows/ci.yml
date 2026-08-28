@@ -511,7 +511,7 @@ jobs:
           # substitute exactly what nextflow substitutes: the ${...} references
           # and the \$ escapes. Line continuations must survive untouched - an
           # earlier version of this stripped them and hid a real bug.
-          sed -e "s|\${projectDir}|$PWD|g" \
+          sed -e "s|\${qmd}|$PWD/qmds/loco-report.qmd|g" \
               -e "s|\${outdir}|$FIX|g" \
               -e "s|\${id}|CI_TEST|g" \
               -e 's|\\\$|$|g' \

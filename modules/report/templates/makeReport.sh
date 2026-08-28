@@ -8,7 +8,9 @@
 # will not follow paths outside the project directory to do it.
 set -euo pipefail
 
-cp ${projectDir}/qmds/loco-report.qmd .
+# the template is staged into this directory by nextflow; copy it under a
+# different name so `rm` at the end cannot remove the staged input itself
+cp -L ${qmd} report.qmd
 
 mkdir -p figures docs
 
@@ -26,9 +28,9 @@ find figures -name '*.pdf' | while read -r p ; do
     convert -density 150 "\$p" "\${p%.pdf}.png" 2>/dev/null || true
 done
 
-quarto render loco-report.qmd \
+quarto render report.qmd \
     -P title:${id} \
     -P outdir:${outdir} \
     -o ${id}-loco-report.html
 
-rm -f *.qmd
+rm -f report.qmd
