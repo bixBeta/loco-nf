@@ -171,6 +171,11 @@ samples <- tryCatch(read.delim("docs/samples.tsv"), error = function(e) NULL)
 contigs <- tryCatch(read.delim("docs/contigs.tsv", header = FALSE), error = function(e) NULL)
 ```
 
+This report collects the diagnostic figures produced by
+[loco-pipe](https://github.com/sudmantlab/loco-pipe) for your low coverage
+whole genome sequencing experiment. The analyses and their defaults are
+loco-pipe's; this document assembles the output and records the settings used.
+
 ### Sample Tracking
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
