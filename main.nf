@@ -146,6 +146,25 @@ def checkRef() {
 }
 
 
+// loco-pipe's chr_table takes an optional second column: a short name to show
+// on plots. Without it every facet strip carries the full contig name, which is
+// then truncated to something unreadable like "...iatus.Sebrube.F.HiC". Prefer a
+// trailing number, else the last token.
+def contigLabel(String n) {
+
+    // "...HiC_scaffold_15" -> "15", "LG12" -> "12", "chr_big" -> "big"
+    def m = (n =~ /(?i).*(?:scaffold|chrom|chr|contig|ctg|LG|SUPER)[_.-]?([A-Za-z0-9]+)$/)
+    if( m.matches() ) return m.group(1)
+
+    // Short enough to read as it is. Accessions like NC_044048.1 land here, and
+    // must not be shortened to their version suffix, which would collide.
+    if( n.length() <= 14 ) return n
+
+    def parts = n.split(/[._-]/).findAll { it }
+    return parts ? parts[-1] : n
+}
+
+
 // The reference is the authority on what may be analysed, so the contig list is
 // read from the .fai rather than trusted from the sheet.
 def faiContigs() {
@@ -299,7 +318,7 @@ workflow RUN {
         if( keep.size() > 100 )
             log.warn "${keep.size()} contigs pass --minlen. loco-pipe parallelizes by contig and is not comfortable much beyond 100; consider raising --minlen or giving --contigs."
 
-        contigs = keep.collect { it.name }.join("\n") + "\n"
+        contigs = keep.collect { "${it.name}\t${contigLabel(it.name)}" }.join("\n") + "\n"
     }
 
     // `loco-pipe init` requires the bam files themselves: it validates that each

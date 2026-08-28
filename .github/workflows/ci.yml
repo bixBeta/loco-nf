@@ -239,10 +239,18 @@ jobs:
           [ "$(grep -c . "$CI_CAPTURE/samples.tsv")" -eq 5 ] \
             || fail "expected header + 4 samples"
 
-          # contigs: chr_small is below the default minlen and must be dropped
-          grep -qx 'chr_big' "$CI_CAPTURE/contigs.tsv"   || fail "chr_big missing"
-          grep -qx 'chr_mid' "$CI_CAPTURE/contigs.tsv"   || fail "chr_mid missing"
-          if grep -qx 'chr_small' "$CI_CAPTURE/contigs.tsv" ; then fail "chr_small should be below --minlen" ; fi
+          # contigs: chr_small is below the default minlen and must be dropped.
+          # The table now carries a second column of short plot labels, so
+          # compare on the first field.
+          cut -f1 "$CI_CAPTURE/contigs.tsv" | grep -qx 'chr_big' || fail "chr_big missing"
+          cut -f1 "$CI_CAPTURE/contigs.tsv" | grep -qx 'chr_mid' || fail "chr_mid missing"
+          if cut -f1 "$CI_CAPTURE/contigs.tsv" | grep -qx 'chr_small' ; then
+            fail "chr_small should be below --minlen"
+          fi
+          # the short label keeps facet strips readable instead of truncating
+          # the full contig name
+          grep -qx "$(printf 'chr_big\tbig')" "$CI_CAPTURE/contigs.tsv" \
+            || fail "no short plot label for chr_big" 
 
           # -@ matches what nextflow reserved, not a hardcoded number
           grep -qx -- '2' "$CI_CAPTURE/start.command.txt" || fail "-@ did not match task.cpus"

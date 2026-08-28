@@ -21,7 +21,15 @@ format:
 
 ```{=html}
 <style type="text/css">
-  .quarto-title-banner { height: 100px; }
+  /* a fixed height clipped the title; let it size to its content */
+  .quarto-title-banner { min-height: 100px; height: auto; }
+
+  /* loco-pipe's figures are large. Scale them to the column instead of
+     overflowing it, which is what made the ohana panels unreadable. */
+  .quarto-figure img, .cell-output-display img, p img {
+    max-width: 100%;
+    height: auto;
+  }
   .main-container { max-width: 90% !important; margin: auto; }
   .quarto-title-meta-contents a:hover { color: #c44900; }
 
@@ -124,7 +132,7 @@ suppressPackageStartupMessages({
 # Every module in loco-pipe can be switched off in locopipe.yaml, so nothing
 # here assumes a file exists. A section that has no figures says so rather than
 # failing the render.
-fig <- function(path, width = "1000px") {
+fig <- function(path, width = "100%") {
   if (file.exists(path)) {
     cat(sprintf("![](%s){width=%s}\n\n", path, width))
   } else {
@@ -134,7 +142,7 @@ fig <- function(path, width = "1000px") {
 
 # One paginated tabset per collection of per-sample / per-population figures.
 # The navigator above replaces the tab bar, so this only has to emit the panels.
-tabset <- function(paths, labels, width = "1000px") {
+tabset <- function(paths, labels, width = "100%") {
   if (length(paths) == 0) {
     cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
     return(invisible(NULL))
@@ -163,21 +171,11 @@ samples <- tryCatch(read.delim("docs/samples.tsv"), error = function(e) NULL)
 contigs <- tryCatch(read.delim("docs/contigs.tsv", header = FALSE), error = function(e) NULL)
 ```
 
-This report collects the diagnostic figures produced by
-[loco-pipe](https://github.com/sudmantlab/loco-pipe) for your low coverage
-whole genome sequencing experiment. The analyses and their defaults are
-loco-pipe's; this document assembles the output and records the settings used.
-
-> Users receiving files from RSCshare are advised to delete all files once they
-> have secure copied them to their own respective drives.<br> A copy of your
-> data will be securely archived on our end and may incur a fee for future
-> retrievals.
-
 ### Sample Tracking
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 if (!is.null(samples)) {
-  datatable(samples, options = list(scrollX = TRUE, pageLength = 15)) |>
+  datatable(samples, options = list(scrollX = TRUE, pageLength = 5)) |>
     DT::formatStyle(names(samples), lineHeight = "100%")
 } else {
   cat("*No docs/samples.tsv found.*")
