@@ -50,6 +50,7 @@ process LOCOPIPE {
         val   bams
         val   refpath
         val   outdir
+        val   settings      // only to make an edited locopipe.yaml invalidate the cache
         path  ref
         path  fai
 

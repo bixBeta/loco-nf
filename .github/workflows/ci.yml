@@ -422,6 +422,15 @@ jobs:
           [ "$before_c" = "$after_c" ] || { echo "contigs.tsv was rewritten unchanged"; exit 1; }
           grep -q 'EDITED_BY_OPERATOR' reuse_outdir/locopipe.yaml \
             || { echo "init clobbered the operator's locopipe.yaml"; exit 1; }
+          # an edit to locopipe.yaml must reach the task rather than being
+          # skipped as an unchanged run: the settings live only in that file, so
+          # nextflow has to see it change
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir reuse_outdir --threads 2 --launch false -resume 2>&1)
+          echo "$out" | grep -qi 'cached' && {
+            echo "$out" | tail -20
+            echo "an edited locopipe.yaml was ignored by -resume"; exit 1; }
           # ... but a real change to the sheet still lands
           sleep 1.1
           nextflow run . -c test/ci.config --sheet test/sample-sheet-onegroup.csv \

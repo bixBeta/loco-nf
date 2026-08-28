@@ -352,6 +352,19 @@ workflow RUN {
     // records absolute paths into locopipe.yaml.
     def outdir = file(params.outdir).toAbsolutePath().normalize().toString()
 
+    // Editing <outdir>/locopipe.yaml - which is where every analysis threshold
+    // lives, and what the operator is told to tune - changes nothing nextflow
+    // can see, so a -resume run would reuse the cached task and the new
+    // settings would never reach snakemake. Feeding the file's content in as a
+    // value makes an edit invalidate the cache, and snakemake then redoes only
+    // the rules whose params actually changed.
+    //
+    // One consequence: the first -resume after an initial run always re-runs the
+    // task, because the file went from absent to present. That pass is cheap -
+    // snakemake finds everything up to date - and it is stable from then on.
+    def settingsFile = file("${outdir}/locopipe.yaml")
+    def settings = settingsFile.exists() ? settingsFile.text : "absent"
+
     // Created here, on the host, before anything is scheduled. The results
     // directory is bind mounted into the image, and Apptainer treats a bind
     // source that does not exist as fatal:
@@ -361,7 +374,8 @@ workflow RUN {
     if( !workflow.stubRun ) file(outdir).mkdirs()
 
     LOCOPIPE( ch_pin, ch_samples, ch_contigs, ch_bams, channel.value(refpath),
-              channel.value(outdir), file(params.ref), file("${params.ref}.fai") )
+              channel.value(outdir), channel.value(settings),
+              file(params.ref), file("${params.ref}.fai") )
 
     // The report reads the finished results, so it waits on LOCOPIPE rather
     // than on the outdir existing.
