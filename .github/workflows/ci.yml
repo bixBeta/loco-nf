@@ -521,6 +521,14 @@ jobs:
           if grep -qE '(^|[^\\])\\\\$' /tmp/render.sh ; then
             echo "doubled line continuation in makeReport.sh"; exit 1
           fi
+          # $HOME is read-only inside the container on the cluster, and quarto
+          # caches under it. This job runs as root, where a chmod'd directory is
+          # still writable, so the read-only case cannot be reproduced here -
+          # assert the script does not depend on a writable home instead.
+          grep -q 'export HOME=' /tmp/render.sh || {
+            echo "makeReport.sh does not make HOME task-local"; exit 1; }
+          grep -q 'export XDG_CACHE_HOME=' /tmp/render.sh || {
+            echo "makeReport.sh does not make XDG_CACHE_HOME task-local"; exit 1; }
           mkdir -p /tmp/render && cd /tmp/render
           bash /tmp/render.sh
           test -f CI_TEST-loco-report.html || { echo "no report produced"; exit 1; }

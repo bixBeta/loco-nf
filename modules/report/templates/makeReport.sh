@@ -8,6 +8,16 @@
 # will not follow paths outside the project directory to do it.
 set -euo pipefail
 
+# Quarto keeps a cache under \$XDG_CACHE_HOME, defaulting to \$HOME/.cache, and
+# \$HOME is read-only inside the container on this cluster:
+#   Read-only file system (os error 30): mkdir '/home/<user>/.cache/quarto'
+# The same applies to any renderer that assumes a writable home, so keep both
+# task-local, exactly as the analysis task does.
+export HOME="\$PWD"
+export XDG_CACHE_HOME="\$PWD/.cache"
+export XDG_DATA_HOME="\$PWD/.local/share"
+mkdir -p "\$XDG_CACHE_HOME" "\$XDG_DATA_HOME"
+
 # the template is staged into this directory by nextflow; copy it under a
 # different name so `rm` at the end cannot remove the staged input itself
 cp -L ${qmd} report.qmd
