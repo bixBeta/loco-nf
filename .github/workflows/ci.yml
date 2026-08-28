@@ -400,6 +400,10 @@ jobs:
       # Two properties that make --outdir worth having. Both are easy to lose:
       # an unchanged rerun must not touch the tables ( snakemake reruns on mtime
       # ), and init must not clobber the settings file the operator edits.
+      # Two properties that make --outdir worth having, and one that makes it
+      # usable: an unchanged rerun must not touch the tables ( snakemake reruns
+      # on mtime ), init must not clobber the settings file the operator edits,
+      # and editing that file must actually reach the next run.
       - name: An unchanged rerun leaves the tables and settings alone
         run: |
           set -euo pipefail
@@ -407,35 +411,45 @@ jobs:
           run() {
             nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
               --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
-              --outdir reuse_outdir --threads 2 "$@"
+              --outdir reuse_outdir --threads 2 --launch false "$@" 2>&1
           }
-          run --launch false
-          # the operator edits locopipe.yaml for analysis settings
-          echo "# EDITED_BY_OPERATOR" >> reuse_outdir/locopipe.yaml
+
+          run > /dev/null
           before_s=$(stat -c %Y reuse_outdir/docs/samples.tsv)
           before_c=$(stat -c %Y reuse_outdir/docs/contigs.tsv)
+          echo "# EDITED_BY_OPERATOR" >> reuse_outdir/locopipe.yaml
+
           sleep 1.1
-          run --launch false
-          after_s=$(stat -c %Y reuse_outdir/docs/samples.tsv)
-          after_c=$(stat -c %Y reuse_outdir/docs/contigs.tsv)
-          [ "$before_s" = "$after_s" ] || { echo "samples.tsv was rewritten unchanged"; exit 1; }
-          [ "$before_c" = "$after_c" ] || { echo "contigs.tsv was rewritten unchanged"; exit 1; }
+          run > /dev/null
+          [ "$before_s" = "$(stat -c %Y reuse_outdir/docs/samples.tsv)" ] \
+            || { echo "samples.tsv was rewritten unchanged"; exit 1; }
+          [ "$before_c" = "$(stat -c %Y reuse_outdir/docs/contigs.tsv)" ] \
+            || { echo "contigs.tsv was rewritten unchanged"; exit 1; }
           grep -q 'EDITED_BY_OPERATOR' reuse_outdir/locopipe.yaml \
             || { echo "init clobbered the operator's locopipe.yaml"; exit 1; }
-          # an edit to locopipe.yaml must reach the task rather than being
-          # skipped as an unchanged run: the settings live only in that file, so
-          # nextflow has to see it change
-          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
-                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
-                  --outdir reuse_outdir --threads 2 --launch false -resume 2>&1)
-          echo "$out" | grep -qi 'cached' && {
+
+          # Settle the cache: locopipe.yaml went absent -> present, so the first
+          # -resume re-runs. The second must be cached, which is the baseline the
+          # next assertion needs.
+          run -resume > /dev/null
+          out=$(run -resume)
+          echo "$out" | grep -qi 'cached' \
+            || { echo "$out" | tail -20; echo "an unchanged -resume did not reuse the task"; exit 1; }
+
+          # Now edit the settings. Every analysis threshold lives in that file
+          # and nextflow cannot otherwise see it, so this must NOT be cached.
+          echo "# EDITED_AGAIN" >> reuse_outdir/locopipe.yaml
+          out=$(run -resume)
+          if echo "$out" | grep -qi 'cached' ; then
             echo "$out" | tail -20
-            echo "an edited locopipe.yaml was ignored by -resume"; exit 1; }
-          # ... but a real change to the sheet still lands
+            echo "an edited locopipe.yaml was ignored by -resume"; exit 1
+          fi
+
+          # ... and a changed sheet still updates the table
           sleep 1.1
           nextflow run . -c test/ci.config --sheet test/sample-sheet-onegroup.csv \
             --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
-            --outdir reuse_outdir --threads 2 --launch false
+            --outdir reuse_outdir --threads 2 --launch false > /dev/null
           [ "$(stat -c %Y reuse_outdir/docs/samples.tsv)" != "$before_s" ] \
             || { echo "a changed sheet did not update samples.tsv"; exit 1; }
           rm -rf reuse_outdir
