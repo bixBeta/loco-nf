@@ -44,6 +44,23 @@ mkdir -p ref bams bin
 sleep 1
 touch ref/ref.fa.fai
 
+# A second reference whose short labels would collide: chr_1 and scaffold_1
+# both shorten to "1". Used with --minlen 100 so the contigs can stay tiny.
+{
+    echo ">chr_1"
+    head -c 200 /dev/zero | tr '\0' 'A'
+    echo
+    echo ">scaffold_1"
+    head -c 150 /dev/zero | tr '\0' 'C'
+    echo
+} > ref/collide.fa
+{
+    printf 'chr_1\t200\t7\t200\t201\n'
+    printf 'scaffold_1\t150\t220\t150\t151\n'
+} > ref/collide.fa.fai
+sleep 1
+touch ref/collide.fa.fai
+
 # ---- bams -------------------------------------------------------------------
 for s in S1 S2 S3 S4 ; do
     : > "bams/${s}.bam"

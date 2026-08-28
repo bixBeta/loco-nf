@@ -302,6 +302,26 @@ jobs:
             || { cat "$CI_CAPTURE/samples.tsv"; echo "bam path not absolute"; exit 1; }
           echo "relative paths resolved"
 
+      # Two contigs that shorten to the same label would be plotted under one
+      # facet, mislabelling the figure rather than merely looking untidy.
+      - name: Colliding short labels fall back to full contig names
+        env:
+          CI_CAPTURE: ${{ github.workspace }}/ci-capture-collide
+        run: |
+          set -euo pipefail
+          rm -rf "$CI_CAPTURE" collide_outdir
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/collide.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir collide_outdir --minlen 100 --threads 2
+          cat "$CI_CAPTURE/contigs.tsv"
+          # chr_1 and scaffold_1 both shorten to "1", so neither may be labelled "1"
+          grep -qx "$(printf 'chr_1\tchr_1')"           "$CI_CAPTURE/contigs.tsv" \
+            || { echo "chr_1 was not disambiguated"; exit 1; }
+          grep -qx "$(printf 'scaffold_1\tscaffold_1')" "$CI_CAPTURE/contigs.tsv" \
+            || { echo "scaffold_1 was not disambiguated"; exit 1; }
+          rm -rf collide_outdir
+          echo "label collision OK"
+
       - name: An explicit contig list wins over minlen
         env:
           CI_CAPTURE: ${{ github.workspace }}/ci-capture-contigs

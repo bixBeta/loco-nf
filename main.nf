@@ -318,7 +318,17 @@ workflow RUN {
         if( keep.size() > 100 )
             log.warn "${keep.size()} contigs pass --minlen. loco-pipe parallelizes by contig and is not comfortable much beyond 100; consider raising --minlen or giving --contigs."
 
-        contigs = keep.collect { "${it.name}\t${contigLabel(it.name)}" }.join("\n") + "\n"
+        // A short label that is not unique would put two different contigs
+        // under one facet, mislabelling the plot rather than just looking
+        // untidy. chr_1 and scaffold_1 both shorten to "1", so fall back to the
+        // full name wherever that happens.
+        def labels = keep.collect { contigLabel(it.name) }
+        def seen = [:]
+        labels.each { seen[it] = (seen[it] ?: 0) + 1 }
+
+        contigs = [keep, labels].transpose().collect { c, l ->
+            "${c.name}\t${seen[l] > 1 ? c.name : l}"
+        }.join("\n") + "\n"
     }
 
     // `loco-pipe init` requires the bam files themselves: it validates that each
