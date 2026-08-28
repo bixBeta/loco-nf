@@ -132,12 +132,37 @@ suppressPackageStartupMessages({
 # Every module in loco-pipe can be switched off in locopipe.yaml, so nothing
 # here assumes a file exists. A section that has no figures says so rather than
 # failing the render.
-# No width attribute: the CSS above caps oversized figures at the column width
-# while leaving smaller ones at their natural size. Forcing width=100% upscaled
-# ohana's 3cm-wide panel to 1600px and made it a blurry, 3700px-tall sliver.
+# loco-pipe's figures are used exactly as it produces them; only how they are
+# displayed is decided here. Their shapes differ a lot - sfs is 3000x1500,
+# ohana is 1350x2100 - so one width suits none of them. A single width would
+# stretch the portrait ohana panels down the page, which is what made them
+# unreadable.
+#
+# Read the size out of the PNG header ( no extra package needed ) and constrain
+# landscape figures by width, portrait ones by height. Never above the natural
+# size, so nothing is upscaled into blur.
+MAX_W <- 1000
+MAX_H <- 750
+
+png_dim <- function(path) {
+  con <- file(path, "rb"); on.exit(close(con))
+  if (!identical(as.integer(readBin(con, "raw", 8)),
+                 c(137L, 80L, 78L, 71L, 13L, 10L, 26L, 10L))) return(NULL)
+  readBin(con, "raw", 8)                      # chunk length + "IHDR"
+  be <- function() sum(as.numeric(readBin(con, "raw", 4)) * c(2^24, 2^16, 2^8, 1))
+  c(be(), be())
+}
+
+sizeAttr <- function(path) {
+  d <- tryCatch(png_dim(path), error = function(e) NULL)
+  if (is.null(d) || any(!is.finite(d)) || any(d <= 0)) return("")
+  if (d[1] / d[2] < 1) sprintf("{height=%dpx}", as.integer(min(MAX_H, d[2])))
+  else                 sprintf("{width=%dpx}",  as.integer(min(MAX_W, d[1])))
+}
+
 fig <- function(path) {
   if (file.exists(path)) {
-    cat(sprintf("![](%s)\n\n", path))
+    cat(sprintf("![](%s)%s\n\n", path, sizeAttr(path)))
   } else {
     cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
   }
@@ -153,7 +178,7 @@ tabset <- function(paths, labels) {
   cat("::: {.panel-tabset}\n\n")
   for (i in seq_along(paths)) {
     cat(paste0("## ", labels[i], "\n\n"))
-    cat(paste0("![](", paths[i], ")\n\n"))
+    cat(paste0("![](", paths[i], ")", sizeAttr(paths[i]), "\n\n"))
   }
   cat(":::\n\n")
 }

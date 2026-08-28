@@ -487,6 +487,9 @@ jobs:
           png $FIX/figures/pcangsd/global/combined.subsetted.png
           png $FIX/figures/pcangsd/local/alpha.combined.subsetted.png
           png $FIX/figures/pcangsd/local/beta.combined.subsetted.png
+          # ohana is the one portrait figure, and the reason sizing is per-image
+          mkdir -p $FIX/figures/ohana/global
+          convert -size 135x210 xc:white $FIX/figures/ohana/global/combined.subsetted.png
           png $FIX/figures/sfs/alpha.sfs.png
           png $FIX/figures/sfs/beta.sfs.png
           png $FIX/figures/fst/alpha.beta.png
@@ -559,4 +562,8 @@ jobs:
           grep -q 'tab-navigator'         "$H" || { echo "paginator missing"; exit 1; }
           # theta was absent from the fixture: the section must say so, not fail
           grep -q 'This module was not run' "$H" || { echo "missing-module note absent"; exit 1; }
+          # sizing is decided per image: landscape figures constrained by width,
+          # the portrait ohana panel by height, so it does not run down the page
+          grep -qE 'width="?[0-9]+"?' "$H" || { echo "no width applied to landscape figures"; exit 1; }
+          grep -qE 'height="?[0-9]+"?' "$H" || { echo "portrait figure not constrained by height"; exit 1; }
           echo "report content OK"
