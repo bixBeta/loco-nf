@@ -164,15 +164,17 @@ fig <- function(path) {
   if (file.exists(path)) {
     cat(sprintf("![](%s)%s\n\n", path, sizeAttr(path)))
   } else {
-    cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
+    # Name the file: "not produced" on its own gives no way to tell a module
+    # that was switched off from one whose output landed somewhere unexpected.
+    cat(sprintf("*Not produced: `%s` is missing. Either this module is turned off in `locopipe.yaml`, or it did not run.*\n\n", path))
   }
 }
 
 # One paginated tabset per collection of per-sample / per-population figures.
 # The navigator above replaces the tab bar, so this only has to emit the panels.
-tabset <- function(paths, labels) {
+tabset <- function(paths, labels, what = "figures") {
   if (length(paths) == 0) {
-    cat("*Not produced. This module was not run, or is turned off in `locopipe.yaml`.*\n\n")
+    cat(sprintf("*Not produced: no %s found. Either this module is turned off in `locopipe.yaml`, or it did not run.*\n\n", what))
     return(invisible(NULL))
   }
   cat("::: {.panel-tabset}\n\n")

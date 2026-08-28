@@ -32,10 +32,18 @@ cp -rL ${outdir}/docs/.    docs/    2>/dev/null || true
 cp -L  ${outdir}/locopipe.yaml . 2>/dev/null || true
 cp -L  ${outdir}/angsd/get_depth_global/depth_filter.tsv . 2>/dev/null || true
 
-# lostruct writes one of its figures as a PDF. Convert it so it embeds like
-# every other figure; ImageMagick and ghostscript are both in this image.
+# lostruct writes separated.pca as a PDF, and it is the only figure the report
+# expects that loco-pipe does not emit as a png. [0] takes the first page, so
+# the output is <name>.png rather than <name>-0.png. Failures are reported
+# rather than swallowed: silently skipping left the report saying the module had
+# not run, which was misleading.
 find figures -name '*.pdf' | while read -r p ; do
-    convert -density 150 "\$p" "\${p%.pdf}.png" 2>/dev/null || true
+    out="\${p%.pdf}.png"
+    if convert -density 150 "\${p}[0]" "\$out" 2>&1 ; then
+        echo "converted \$p -> \$out"
+    else
+        echo "WARNING: could not convert \$p; the report will list it as missing" >&2
+    fi
 done
 
 quarto render report.qmd \

@@ -598,6 +598,11 @@ jobs:
           mkdir -p /tmp/render && cd /tmp/render
           bash /tmp/render.sh
           test -f CI_TEST-loco-report.html || { echo "no report produced"; exit 1; }
+          # lostruct's separated.pca is the one figure loco-pipe emits as a PDF,
+          # so the report depends on this conversion. It used to fail silently
+          # and show up as "this module was not run".
+          test -f figures/lostruct/global/separated.pca.png \
+            || { echo "the pdf figure was not converted"; exit 1; }
           echo "rendered $(du -h CI_TEST-loco-report.html | cut -f1)"
 
       - name: The report is self contained and complete
@@ -616,7 +621,12 @@ jobs:
           # the paginator has to reach the html, or the tabsets are unusable
           grep -q 'tab-navigator'         "$H" || { echo "paginator missing"; exit 1; }
           # theta was absent from the fixture: the section must say so, not fail
-          grep -q 'This module was not run' "$H" || { echo "missing-module note absent"; exit 1; }
+          # theta was absent from the fixture: the note must name the file, so a
+          # module that was switched off is distinguishable from output that
+          # landed somewhere unexpected
+          grep -q 'Not produced' "$H" || { echo "missing-module note absent"; exit 1; }
+          grep -qE 'Not produced: (no [a-z]+ found|`[^`]+` is missing)' "$H" \
+            || { echo "the missing-output note does not say what is missing"; exit 1; }
           # sizing is decided per image: landscape figures constrained by width,
           # the portrait ohana panel by height, so it does not run down the page
           grep -qE 'width="?[0-9]+"?' "$H" || { echo "no width applied to landscape figures"; exit 1; }
