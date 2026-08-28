@@ -72,24 +72,51 @@ process LOCOPIPE {
     mkdir -p ${outdir}
     cd ${outdir}
 
+    # Lay the project out ONCE. `loco-pipe init` opens locopipe.yaml with 'w',
+    # so running it again discards whatever analysis settings were edited there
+    # - which is precisely the file the operator is told to edit. Delete
+    # locopipe.yaml, or the whole directory, to start over.
+    #
     # init takes the bam files themselves ( not the reference ) as its
     # positional argument, and checks each one exists and is readable, which
     # also proves the container can see them. Its samples.tsv is overwritten
     # below, since init assigns every sample to a single group.
-    loco-pipe init -o . -r ${refpath} ${bams} > "\$task_dir/init.log" 2>&1 || {
-        cat "\$task_dir/init.log" ; exit 1 ; }
+    if [ ! -f locopipe.yaml ] ; then
+        loco-pipe init -o . -r ${refpath} ${bams} > "\$task_dir/init.log" 2>&1 || {
+            cat "\$task_dir/init.log" ; exit 1 ; }
+    else
+        echo "reusing the project in ${outdir}; delete locopipe.yaml to start over"
+    fi
+
+    # The generated profile carries rerun-triggers: [mtime, params], so merely
+    # rewriting a table makes snakemake redo everything downstream of it even
+    # when the content is identical - which defeats the whole point of keeping
+    # the project outside work/. Write only on a real change.
+    write_if_changed() {
+        tmp=\$(mktemp)
+        cat > "\$tmp"
+        if [ -f "\$1" ] && cmp -s "\$tmp" "\$1" ; then
+            rm -f "\$tmp"
+        else
+            mv "\$tmp" "\$1"
+            echo "updated \$1"
+        fi
+    }
+
+    mkdir -p docs
 
     # the two tables the sheet actually determines
-    cat > docs/samples.tsv <<'SAMPLES_TSV'
+    write_if_changed docs/samples.tsv <<'SAMPLES_TSV'
 ${samples}
 SAMPLES_TSV
 
-    cat > docs/contigs.tsv <<'CONTIGS_TSV'
+    write_if_changed docs/contigs.tsv <<'CONTIGS_TSV'
 ${contigs}
 CONTIGS_TSV
 
     # Snakemake would otherwise rebuild every conda env at run time and ignore
-    # the image entirely. Edits workflow/config.yaml, which is now beside us.
+    # the image entirely. Idempotent: it rewrites workflow/config.yaml only
+    # while the conda keys are still there.
     loco-pipe-local
 
     # terminator at column 0, like the two above. <<- strips leading TABS only,

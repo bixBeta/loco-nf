@@ -377,6 +377,41 @@ jobs:
           rm -rf fresh_outdir
           echo "outdir creation OK"
 
+      # Two properties that make --outdir worth having. Both are easy to lose:
+      # an unchanged rerun must not touch the tables ( snakemake reruns on mtime
+      # ), and init must not clobber the settings file the operator edits.
+      - name: An unchanged rerun leaves the tables and settings alone
+        run: |
+          set -euo pipefail
+          rm -rf reuse_outdir
+          run() {
+            nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+              --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+              --outdir reuse_outdir --threads 2 "$@"
+          }
+          run --launch false
+          # the operator edits locopipe.yaml for analysis settings
+          echo "# EDITED_BY_OPERATOR" >> reuse_outdir/locopipe.yaml
+          before_s=$(stat -c %Y reuse_outdir/docs/samples.tsv)
+          before_c=$(stat -c %Y reuse_outdir/docs/contigs.tsv)
+          sleep 1.1
+          run --launch false
+          after_s=$(stat -c %Y reuse_outdir/docs/samples.tsv)
+          after_c=$(stat -c %Y reuse_outdir/docs/contigs.tsv)
+          [ "$before_s" = "$after_s" ] || { echo "samples.tsv was rewritten unchanged"; exit 1; }
+          [ "$before_c" = "$after_c" ] || { echo "contigs.tsv was rewritten unchanged"; exit 1; }
+          grep -q 'EDITED_BY_OPERATOR' reuse_outdir/locopipe.yaml \
+            || { echo "init clobbered the operator's locopipe.yaml"; exit 1; }
+          # ... but a real change to the sheet still lands
+          sleep 1.1
+          nextflow run . -c test/ci.config --sheet test/sample-sheet-onegroup.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir reuse_outdir --threads 2 --launch false
+          [ "$(stat -c %Y reuse_outdir/docs/samples.tsv)" != "$before_s" ] \
+            || { echo "a changed sheet did not update samples.tsv"; exit 1; }
+          rm -rf reuse_outdir
+          echo "idempotent rerun OK"
+
       - name: A prepared outdir is reused on the next run
         run: |
           set -euo pipefail
