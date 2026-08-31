@@ -113,8 +113,18 @@ jobs:
           if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
           binds=$(echo "$out" | grep '^binds' || true)
           echo "$binds"
-          echo "$binds" | grep -q -- "-B $PWD/test/bams" || { echo "bam directory not bound"; exit 1; }
-          echo "$binds" | grep -q -- "-B $PWD/test/ref"  || { echo "reference directory not bound"; exit 1; }
+          # The requirement is that a directory is REACHABLE inside the image,
+          # not that it appears verbatim: redundant binds are collapsed, so a
+          # path covered by an ancestor is bound just as effectively.
+          covered() {
+            for o in $(echo "$binds" | tr ' ' '\n' | grep '^/') ; do
+              [ "$1" = "$o" ] && return 0
+              [ "${1#$o/}" != "$1" ] && return 0
+            done
+            return 1
+          }
+          covered "$PWD/test/bams" || { echo "bam directory not reachable"; exit 1; }
+          covered "$PWD/test/ref"  || { echo "reference directory not reachable"; exit 1; }
           # the site defaults must survive
           echo "$binds" | grep -q -- '-B /local'   || { echo "/local bind lost"; exit 1; }
           echo "$binds" | grep -q -- '-B /workdir' || { echo "/workdir bind lost"; exit 1; }
