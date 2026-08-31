@@ -182,6 +182,24 @@ END_VERSIONS
     # -@ matches what Nextflow reserved, so snakemake cannot oversubscribe the
     # allocation it was given. Run from inside the project so it finds workflow/.
     log=\$task_dir/locopipe.log
+
+    # --dryrun asks snakemake what it would run and stops. Everything above has
+    # happened - the tables are written and the settings applied - so this
+    # validates the whole configuration against real data without spending the
+    # hours a real run costs.
+    if [ "${params.dryrun}" == "true" ] ; then
+        loco-pipe start -@ ${task.cpus} -d . 2>&1 | tee "\$log"
+        if grep -qE 'WorkflowError|MissingInputException|Error in rule|^Error' "\$log" ; then
+            echo "the dry run found a problem, see pipeline_info/locopipe.log" >&2
+            tail -40 "\$log" >&2
+            exit 1
+        fi
+        echo
+        echo "DRY RUN: the configuration above is what would be used. Nothing was analysed."
+        echo "Re-run without --dryrun to start."
+        exit 0
+    fi
+
     loco-pipe start -@ ${task.cpus} . 2>&1 | tee "\$log"
 
     # `loco-pipe start` calls subprocess.run without checking the return code,

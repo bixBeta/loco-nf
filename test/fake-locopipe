@@ -125,11 +125,11 @@ YAML
 
     start)
         shift
-        THREADS="" ; DIR="."
+        THREADS="" ; DIR="." ; DRY=0
         while [ $# -gt 0 ] ; do
             case "$1" in
                 -@) THREADS="$2" ; shift 2 ;;
-                -d) shift ;;
+                -d) DRY=1 ; shift ;;
                 *)  DIR="$1" ; shift ;;
             esac
         done
@@ -180,6 +180,17 @@ YAML
         # with no results.
         if [ "${FAKE_EMPTY:-0}" = "1" ] ; then
             echo "Nothing to be done (all requested files are present and up to date)."
+            exit 0
+        fi
+
+        # real `loco-pipe start -d` builds the DAG and reports what it would
+        # run, producing nothing. A fake that created figures anyway would let a
+        # dry run masquerade as a real one.
+        if [ "$DRY" = "1" ] ; then
+            echo "Building DAG of jobs..."
+            echo "Job stats:"
+            echo "total    104"
+            echo "This was a dry-run (flag -n)."
             exit 0
         fi
 

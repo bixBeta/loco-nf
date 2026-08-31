@@ -543,6 +543,28 @@ jobs:
           rm -rf params_outdir
           echo "unknown setting rejected"
 
+      # The way to check a real dataset before committing hours to it: lay
+      # everything out, apply the settings, ask snakemake what it would run, and
+      # produce nothing.
+      - name: A dry run validates the configuration without analysing
+        run: |
+          set -euo pipefail
+          rm -rf dry_outdir
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir dry_outdir --threads 2 --dryrun true 2>&1)
+          echo "$out" | grep -q 'DRY RUN' || { echo "$out" | tail -30; echo "no dry run notice"; exit 1; }
+          # the project is laid out and the tables written ...
+          test -f dry_outdir/docs/samples.tsv || { echo "tables not written"; exit 1; }
+          test -f dry_outdir/locopipe.yaml    || { echo "config not written"; exit 1; }
+          # ... but nothing was analysed, and no report was rendered
+          if [ -d dry_outdir/figures ] ; then echo "a dry run produced figures"; exit 1 ; fi
+          if ls pipeline_info/*loco-report.html >/dev/null 2>&1 ; then
+            echo "a dry run rendered a report"; exit 1
+          fi
+          rm -rf dry_outdir
+          echo "dry run OK"
+
       - name: A prepared outdir is reused on the next run
         run: |
           set -euo pipefail
