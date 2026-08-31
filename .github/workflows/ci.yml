@@ -196,6 +196,46 @@ jobs:
             && { echo "expected failure"; exit 1; }
           echo "$out" | grep -q 'S1: no bam at' || { echo "$out" | tail -20; exit 1; }
 
+      # 'label' is what the other bixBeta pipelines call this column, so a sheet
+      # written for those must work here too.
+      - name: A sheet using the house 'label' column is accepted
+        env:
+          CI_CAPTURE: ${{ github.workspace }}/ci-capture-label
+        run: |
+          set -euo pipefail
+          rm -rf "$CI_CAPTURE" label_outdir
+          nextflow run . -c test/ci.config --sheet test/sample-sheet-label.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir label_outdir --threads 2
+          grep -qx "$(printf 'S1\t%s/test/bams/S1.bam\talpha' "$PWD")" "$CI_CAPTURE/samples.tsv" \
+            || { cat "$CI_CAPTURE/samples.tsv"; echo "label column not used as the sample name"; exit 1; }
+          rm -rf label_outdir
+          echo "label column OK"
+
+      # Bams symlinked into a previous pipeline's work dirs resolve to one
+      # canonical path each, so the bind list grew with the sample count even
+      # though every one was already under /local.
+      - name: Redundant binds are collapsed
+        run: |
+          set -euo pipefail
+          set +e
+          out=$(nextflow run . -stub-run -c test/ci.config \
+                  --sheet test/sample-sheet.csv --ref "$PWD/test/ref/ref.fa" 2>&1)
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] ; then echo "$out" | tail -30 ; exit 1 ; fi
+          binds=$(echo "$out" | grep '^binds' || true)
+          echo "$binds"
+          # nothing under a directory that is itself bound
+          for d in $(echo "$binds" | tr ' ' '\n' | grep '^/' ) ; do
+            for o in $(echo "$binds" | tr ' ' '\n' | grep '^/' ) ; do
+              if [ "$d" != "$o" ] && [ "${d#$o/}" != "$d" ] ; then
+                echo "$d is already covered by $o"; exit 1
+              fi
+            done
+          done
+          echo "binds collapsed OK"
+
       - name: A missing column is named, with what was found
         run: |
           set -euo pipefail

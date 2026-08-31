@@ -76,6 +76,13 @@ done
     echo "S4,$PWD/bams/S4.bam,beta"
 } > sample-sheet.csv
 
+# the column name the other bixBeta pipelines use
+{
+    echo "label,bam,group"
+    echo "S1,$PWD/bams/S1.bam,alpha"
+    echo "S2,$PWD/bams/S2.bam,beta"
+} > sample-sheet-label.csv
+
 # every sample in one group: should warn, not fail
 {
     echo "sample,bam,group"

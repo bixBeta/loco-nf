@@ -308,11 +308,18 @@ def readSheet() {
         error "sample-sheet: ${params.sheet} is empty"
 
     def header = lines[0].split(',').collect { it.trim().toLowerCase() }
-    ['sample','bam','group'].each {
+
+    // `label` is what the other bixBeta pipelines call this column, and
+    // `sample_name` is what loco-pipe itself writes, so both are accepted.
+    def sampleCol = ['sample','label','sample_name'].find { header.contains(it) }
+    if( !sampleCol )
+        error "sample-sheet: no sample column. Found: ${header.join(', ')}. Name it 'sample', 'label' or 'sample_name'. See --help."
+
+    ['bam','group'].each {
         if( !header.contains(it) )
             error "sample-sheet: missing required column '${it}'. Found: ${header.join(', ')}. See --help."
     }
-    def ix = [ sample: header.indexOf('sample'), bam: header.indexOf('bam'), group: header.indexOf('group') ]
+    def ix = [ sample: header.indexOf(sampleCol), bam: header.indexOf('bam'), group: header.indexOf('group') ]
 
     lines.drop(1).eachWithIndex { line, i ->
 
