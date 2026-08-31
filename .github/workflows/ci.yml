@@ -474,8 +474,10 @@ jobs:
           grep -qE '^  minmaf: "0.01"' params_outdir/locopipe.yaml || { echo "minmaf not applied"; exit 1; }
           # only the named setting changed: pcangsd's own minmaf is untouched
           grep -qE '^  minmaf: 0.05'  params_outdir/locopipe.yaml || { echo "an unnamed minmaf was changed"; exit 1; }
-          # and the comments the operator reads are still there
-          [ "$(grep -c '^  #' params_outdir/locopipe.yaml)" -gt 100 ] \
+          # the comments the operator reads must survive the edit: the real
+          # locopipe.yaml carries 177 of them and a yaml round-trip would drop
+          # every one
+          grep -q 'KEEP_THIS_COMMENT' params_outdir/locopipe.yaml \
             || { echo "comments were lost"; exit 1; }
           echo "settings applied up front OK"
 

@@ -79,8 +79,41 @@ case "$SUBCMD" in
         printf 'sample_name\tbam\tpopulation\nplaceholder\t/dev/null\tgroupname\n' > "${OUT}/docs/samples.tsv"
         printf 'placeholder_contig\t1\n' > "${OUT}/docs/contigs.tsv"
         : > workflow/scripts/get_depth_filter.R
-        printf 'global:\n  basedir: %s\n  reference: %s\n  scriptdir: %s\n' \
-            "$(cd "$OUT" && pwd)" "$REF" "$PWD/workflow/scripts" > "${OUT}/locopipe.yaml"
+        # A realistic locopipe.yaml, not just the paths: the real one carries
+        # every analysis section and is heavily commented, and --locoparams edits
+        # it in place. A stub with only `global:` would make an override of a
+        # real setting look like a typo.
+        cat > "${OUT}/locopipe.yaml" <<CONFIG
+global:
+  # KEEP_THIS_COMMENT - the merge must not strip comments
+  basedir: $(cd "$OUT" && pwd)
+  reference: $REF
+  scriptdir: $PWD/workflow/scripts
+  sample_table: samples.tsv
+  pop_level: population
+  chr_table: contigs.tsv
+  gl_model: 1
+
+snp_calling_global:
+  # quoted on purpose: the rules interpolate these into shell commands
+  minind_proportion: "0.5"
+  minmaf: "0.05"
+  pval: "1e-6"
+
+get_depth_filter_global:
+  n_sd: 2
+
+subset_snp_list_global:
+  # 1 SNP in every n
+  n: 3
+
+subset_snp_list_local:
+  n: 3
+
+run_pcangsd_global:
+  # unquoted here, and must stay untouched when snp_calling_global.minmaf changes
+  minmaf: 0.05
+CONFIG
         cat > workflow/config.yaml <<'YAML'
 directory: .
 software-deployment-method: conda
