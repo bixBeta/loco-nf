@@ -113,6 +113,9 @@ subset_snp_list_local:
 run_pcangsd_global:
   # unquoted here, and must stay untouched when snp_calling_global.minmaf changes
   minmaf: 0.05
+  # several sections have a threads setting, which is what makes uncommenting
+  # one without its header land it in the section above rather than fail loudly
+  threads: 8
 
 get_depth_global:
   threads: 8

@@ -126,13 +126,36 @@ def main():
             del pending[section]
 
     if pending:
+        sections = list(known)
         missing = []
         for sec, ks in pending.items():
-            for k in ks:
+            for k, v in ks.items():
                 if sec not in known:
                     near = [s for s in known if sec in s or s in sec]
                     hint = f"  ( no such section{'; did you mean ' + near[0] + '?' if near else ''} )"
                     missing.append(f"{sec}.{k}{hint}")
+                    continue
+
+                # The section is real and the setting is real, they just do not
+                # go together. The cause is nearly always a section header left
+                # commented out: the setting under it is indented, so yaml reads
+                # it as one more setting of whichever section was open above.
+                # The one it was meant for is then the next section down that
+                # has it, since the file is generated in upstream's order.
+                i = sections.index(sec)
+                below = [s for s in sections[i + 1:] if k in known[s]]
+                holders = [s for s in sections if k in known[s]]
+                if holders:
+                    guess = below[0] if below else holders[0]
+                    missing.append(
+                        f"{sec}.{k}  ( '{k}' is not a setting of {sec} )\n"
+                        f"      '{k}' belongs to: {', '.join(holders)}\n"
+                        f"      Its own section header is probably still commented out. An\n"
+                        f"      indented setting joins the section above it, so this was read\n"
+                        f"      as part of {sec}.\n"
+                        f"      Uncomment the header as well, so it reads:\n"
+                        f"          {guess}:\n            {k}: {v}"
+                    )
                 else:
                     missing.append(f"{sec}.{k}  ( no such setting in {sec} )")
         sys.exit(
