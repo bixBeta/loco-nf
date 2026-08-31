@@ -481,6 +481,46 @@ jobs:
             || { echo "comments were lost"; exit 1; }
           echo "settings applied up front OK"
 
+      # Upstream's config.yaml can be used as is. Its six run-specific keys are
+      # placeholders ( /path/to/loco-pipe ) and pop_level: species, which would
+      # not match the samples.tsv this front-end writes, so they are rewritten.
+      - name: A complete upstream config is usable directly
+        run: |
+          set -euo pipefail
+          rm -rf conf_outdir
+          cat > /tmp/upstream.yaml <<'YAML'
+          global:
+            basedir: "/path/to/loco-pipe/toyfish"
+            reference: "/path/to/loco-pipe/toyfish/reference/toy_refgen.fa"
+            scriptdir: "/path/to/loco-pipe/workflow/scripts"
+            sample_table: "sample_table.tsv"
+            pop_level: "species"
+            chr_table: "chr_table.tsv"
+            gl_model: 1
+          snp_calling_global:
+            # MY_OWN_COMMENT
+            minmaf: "0.02"
+            pval: "1e-6"
+          subset_snp_list_global:
+            n: 250
+          YAML
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir conf_outdir --lococonfig /tmp/upstream.yaml --threads 2 --launch false
+          C=conf_outdir/locopipe.yaml
+          # the run-specific keys are rewritten ...
+          grep -q "basedir: \"$PWD/conf_outdir\""    "$C" || { grep -n basedir "$C"; echo "basedir not rewritten"; exit 1; }
+          grep -q 'pop_level: "population"'           "$C" || { echo "pop_level not rewritten"; exit 1; }
+          grep -q 'sample_table: "samples.tsv"'       "$C" || { echo "sample_table not rewritten"; exit 1; }
+          grep -q 'chr_table: "contigs.tsv"'          "$C" || { echo "chr_table not rewritten"; exit 1; }
+          if grep -q '/path/to/loco-pipe' "$C" ; then echo "a placeholder path survived"; exit 1; fi
+          # ... and the analysis settings are used exactly as written
+          grep -q 'minmaf: "0.02"'   "$C" || { echo "my minmaf was not used"; exit 1; }
+          grep -q 'n: 250'           "$C" || { echo "my subset n was not used"; exit 1; }
+          grep -q 'MY_OWN_COMMENT'   "$C" || { echo "my comments were lost"; exit 1; }
+          rm -rf conf_outdir
+          echo "upstream config used directly OK"
+
       # A typo must fail, not quietly leave the run on the defaults.
       - name: An unknown setting is rejected
         run: |

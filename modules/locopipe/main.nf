@@ -52,6 +52,7 @@ process LOCOPIPE {
         val   outdir
         val   settings      // only to make an edited locopipe.yaml invalidate the cache
         val   overrides     // contents of --locoparams, likewise
+        val   lococonfig    // contents of --lococonfig, a complete replacement
         path  ref
         path  fai
         path  mergescript
@@ -70,6 +71,23 @@ process LOCOPIPE {
     cat > "\$task_dir/overrides.yaml" <<'LOCO_OVERRIDES'
 ${overrides}
 LOCO_OVERRIDES
+
+    cat > "\$task_dir/lococonfig.yaml" <<'LOCO_CONFIG'
+${lococonfig}
+LOCO_CONFIG
+
+    # The six keys that are specific to this run rather than to the analysis.
+    # Upstream ships them as /path/to/loco-pipe placeholders, and pop_level as
+    # "species", which would not match the samples.tsv this front-end writes.
+    cat > "\$task_dir/forced.yaml" <<'LOCO_FORCED'
+global:
+  basedir: ${outdir}
+  reference: ${refpath}
+  scriptdir: ${outdir}/workflow/scripts
+  sample_table: samples.tsv
+  pop_level: population
+  chr_table: contigs.tsv
+LOCO_FORCED
 
     # init is run from inside the project. It writes workflow/ into the current
     # directory and records scriptdir as an ABSOLUTE path to it in
@@ -93,6 +111,15 @@ LOCO_OVERRIDES
             cat "\$task_dir/init.log" ; exit 1 ; }
     else
         echo "reusing the project in ${outdir}; delete locopipe.yaml to start over"
+    fi
+
+    # A complete config supplied with --lococonfig replaces the generated one,
+    # then the six run-specific keys are put back. Re-applied every run, so that
+    # file stays the source of truth rather than drifting from what ran.
+    if [ -s "\$task_dir/lococonfig.yaml" ] ; then
+        cp "\$task_dir/lococonfig.yaml" locopipe.yaml
+        echo "using the config supplied with --lococonfig"
+        python3 "\$task_dir/${mergescript}" locopipe.yaml "\$task_dir/forced.yaml"
     fi
 
     # Apply --locoparams BEFORE loco-pipe runs, so the first run already uses the
