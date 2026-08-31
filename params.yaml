@@ -56,6 +56,12 @@ threads:       32
 mem:           200                    # GB
 maxforks:      1
 
+# ---- analysis settings ------------------------------------------------------
+# loco-pipe's own thresholds, applied before the first run so nothing is
+# analysed with the defaults and then redone. See loco-params.yaml in this repo
+# for a commented starting point, and --help for the format.
+# locoparams:  loco-params.yaml
+
 # ---- report -----------------------------------------------------------------
 # Rendered with quarto in the sartools image, which already carries quarto, DT
 # and ImageMagick. Point qmdimage at a local .sif to avoid pulling it.

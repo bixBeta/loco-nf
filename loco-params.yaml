@@ -1,0 +1,39 @@
+# =============================================================================
+#  loco-pipe analysis settings, applied BEFORE the first run.
+#
+#      nextflow run bixBeta/loco-nf -r main -params-file params.yaml \
+#          --locoparams loco-params.yaml
+#
+#  Only the settings named here are changed; everything else keeps loco-pipe's
+#  default, and its comments. A setting that does not exist is an error rather
+#  than a silent no-op, so a typo fails the run instead of quietly doing
+#  nothing. See <outdir>/locopipe.yaml for the full set with explanations.
+#
+#  This file is the record of what a run used, so keep it with the project.
+# =============================================================================
+
+# One SNP in every n is kept for the analyses that assume unlinked markers
+# ( PCA, admixture ). loco-pipe's default of 3 is tuned for the toy dataset and
+# is far too dense for real data - upstream says so in the config itself.
+# Pick n so the retained SNPs are spaced beyond the distance LD decays over in
+# your species: 2M SNPs over 500 Mb is one per ~250 bp, so n=400 is ~1 per 100 kb.
+subset_snp_list_global:
+  n: 400
+subset_snp_list_local:
+  n: 400
+
+# Depth cutoffs, in SDs of the fitted depth distribution. This gates every
+# downstream analysis, since the site list is derived from it. Tighten for a
+# repeat-rich genome and check figures/depth/depth_filter.png.
+# get_depth_filter_global:
+#   n_sd: 2
+
+# Minor allele frequency floor for SNP calling. 0.05 discards a lot of real
+# rare variation; 0.01-0.02 is common. Does not affect theta or heterozygosity,
+# which run off the depth-filtered site list rather than the SNP list.
+# snp_calling_global:
+#   minmaf: "0.05"
+
+# Raise for a repeat-rich or fragmented reference.
+# get_depth_global:
+#   minmapq: 20

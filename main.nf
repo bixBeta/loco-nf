@@ -13,6 +13,7 @@ params.contigs          = null
 params.launch           = true
 params.report           = true
 params.minlen           = 1000000
+params.locoparams       = null
 
 // --sif, --sifdir, --threads, --mem and --maxforks are declared in
 // nextflow.config, since process directives are resolved before this script
@@ -52,6 +53,20 @@ Args:
                        It lives outside nextflow's work dir, so snakemake keeps
                        its state there and a failed run resumes where it stopped.
     * --threads      : cores handed to snakemake < default: 32 >
+    * --locoparams   : YAML of loco-pipe analysis settings to apply before the
+                       first run, so nothing is analysed with the defaults and
+                       then redone. Only the settings you name; everything else
+                       keeps loco-pipe's value, comments and all:
+
+                           subset_snp_list_global:
+                             n: 400
+                           get_depth_filter_global:
+                             n_sd: 3
+
+                       A setting that does not exist is an error, not a no-op.
+                       These are re-applied every run, so the file is the record
+                       of what a run used. Anything not named here can still be
+                       hand-edited in <outdir>/locopipe.yaml and will survive.
     * --report       : render an html report when the run finishes < default: true >
     * --launch       : run loco-pipe after preparing < default: true >
                        --launch false stops after writing the tables, so the
@@ -116,6 +131,7 @@ trexID       : ${params.id}
 sheet        : ${params.sheet}
 ref          : ${params.ref}
 contigs      : ${params.contigs ?: "auto, every contig >= ${params.minlen} bp"}
+settings     : ${params.locoparams ?: "loco-pipe defaults"}
 outdir       : ${file(params.outdir).toAbsolutePath().normalize()}
 launch       : ${params.launch}
 threads      : ${params.threads}
@@ -228,6 +244,21 @@ def checkInputs() {
 
     if( params.contigs && !file(params.contigs).exists() )
         error "No contig list at: ${params.contigs}"
+
+    // Checked here so a typo is caught before anything is scheduled; the merge
+    // itself then rejects settings that do not exist.
+    if( params.locoparams ) {
+        if( !file(params.locoparams).exists() )
+            error "No loco-pipe settings file at: ${params.locoparams}"
+        try {
+            def y = new org.yaml.snakeyaml.Yaml().load(file(params.locoparams).text)
+            if( !(y instanceof Map) )
+                error "${params.locoparams}: expected a mapping of loco-pipe sections, see --help"
+        }
+        catch( Exception e ) {
+            error "${params.locoparams}: could not be read as YAML - ${e.message}"
+        }
+    }
 }
 
 checkInputs()
@@ -365,6 +396,10 @@ workflow RUN {
     def settingsFile = file("${outdir}/locopipe.yaml")
     def settings = settingsFile.exists() ? settingsFile.text : "absent"
 
+    // The overrides travel as content, so editing them re-runs the task the way
+    // an edited locopipe.yaml does.
+    def overrides = params.locoparams ? file(params.locoparams).text : ""
+
     // Created here, on the host, before anything is scheduled. The results
     // directory is bind mounted into the image, and Apptainer treats a bind
     // source that does not exist as fatal:
@@ -374,8 +409,9 @@ workflow RUN {
     if( !workflow.stubRun ) file(outdir).mkdirs()
 
     LOCOPIPE( ch_pin, ch_samples, ch_contigs, ch_bams, channel.value(refpath),
-              channel.value(outdir), channel.value(settings),
-              file(params.ref), file("${params.ref}.fai") )
+              channel.value(outdir), channel.value(settings), channel.value(overrides),
+              file(params.ref), file("${params.ref}.fai"),
+              file("${projectDir}/scripts/merge_loco_params.py") )
 
     // The report reads the finished results, so it waits on LOCOPIPE rather
     // than on the outdir existing.

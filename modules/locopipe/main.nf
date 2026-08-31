@@ -51,8 +51,10 @@ process LOCOPIPE {
         val   refpath
         val   outdir
         val   settings      // only to make an edited locopipe.yaml invalidate the cache
+        val   overrides     // contents of --locoparams, likewise
         path  ref
         path  fai
+        path  mergescript
 
     output:
         path "versions.yml"  , emit: versions
@@ -64,6 +66,10 @@ process LOCOPIPE {
     ${TASK_HOME}
 
     task_dir=\$PWD
+
+    cat > "\$task_dir/overrides.yaml" <<'LOCO_OVERRIDES'
+${overrides}
+LOCO_OVERRIDES
 
     # init is run from inside the project. It writes workflow/ into the current
     # directory and records scriptdir as an ABSOLUTE path to it in
@@ -87,6 +93,15 @@ process LOCOPIPE {
             cat "\$task_dir/init.log" ; exit 1 ; }
     else
         echo "reusing the project in ${outdir}; delete locopipe.yaml to start over"
+    fi
+
+    # Apply --locoparams BEFORE loco-pipe runs, so the first run already uses the
+    # intended settings rather than analysing with the defaults and being redone.
+    # Re-applied every run, so that file is the record of what a run used; any
+    # setting it does not name keeps whatever is in locopipe.yaml, including
+    # hand edits. A setting that does not exist is an error, not a no-op.
+    if [ -s "\$task_dir/overrides.yaml" ] ; then
+        python3 "\$task_dir/${mergescript}" locopipe.yaml "\$task_dir/overrides.yaml"
     fi
 
     # The generated profile carries rerun-triggers: [mtime, params], so merely
