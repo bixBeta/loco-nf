@@ -1,39 +1,395 @@
-# =============================================================================
+# ===========================================================================
 #  loco-pipe analysis settings, applied BEFORE the first run.
 #
 #      nextflow run bixBeta/loco-nf -r main -params-file params.yaml \
 #          --locoparams loco-params.yaml
 #
-#  Only the settings named here are changed; everything else keeps loco-pipe's
-#  default, and its comments. A setting that does not exist is an error rather
-#  than a silent no-op, so a typo fails the run instead of quietly doing
-#  nothing. See <outdir>/locopipe.yaml for the full set with explanations.
+#  Every setting loco-pipe has is listed below, commented out, with its
+#  default and loco-pipe's own explanation. Uncomment the ones you want to
+#  change, together with their section header - the section is part of the
+#  path, so an override looks like:
 #
-#  This file is the record of what a run used, so keep it with the project.
-# =============================================================================
+#      subset_snp_list_global:
+#        n: 400
+#
+#  Anything left commented keeps loco-pipe's default. A setting that does
+#  not exist is an error rather than a silent no-op, so a typo fails the run
+#  instead of quietly doing nothing.
+#
+#  Keep this file with the project: it is the record of what a run used.
+#
+#  To start from the complete upstream file instead, edit
+#  https://github.com/sudmantlab/loco-pipe/blob/main/config.yaml and pass it
+#  as --lococonfig; its run-specific paths are rewritten for you.
+#
+#  Not settable here, because the front-end owns them:
+#      global.basedir       set from --outdir
+#      global.reference     set from --ref
+#      global.scriptdir     derived from --outdir
+#      global.sample_table  written from --sheet
+#      global.pop_level     written from --sheet
+#      global.chr_table     written from --ref / --contigs
+# ===========================================================================
 
-# One SNP in every n is kept for the analyses that assume unlinked markers
-# ( PCA, admixture ). loco-pipe's default of 3 is tuned for the toy dataset and
-# is far too dense for real data - upstream says so in the config itself.
-# Pick n so the retained SNPs are spaced beyond the distance LD decays over in
-# your species: 2M SNPs over 500 Mb is one per ~250 bp, so n=400 is ~1 per 100 kb.
-subset_snp_list_global:
-  n: 400
-subset_snp_list_local:
-  n: 400
+# ---------------------------------------------------------------------------
+# to_include:
+# ---------------------------------------------------------------------------
+#     To call SNPs with all samples.
+#   snp_calling_global: true
+#
+#     To perform PCA using PCAngsd for all samples and plot the result.
+#   run_pcangsd_global: true
+#
+#     To perform PCA using PCAngsd for each population separately and plot the result.
+#   run_pcangsd_local: true
+#
+#     To conduct admixture analysis using Ohana for all samples and plot the result.
+#   run_ohana_global: true
+#
+#     To conduct admixture analysis using Ohana for each population separately and plot the result.
+#   run_ohana_local: true
+#
+#     To estimate minor allele frequency in each population separately.
+#   get_maf: true
+#
+#     To estimate Fst in pairs of populations per SNP and in windows, and plot the result.
+#   get_fst: true
+#
+#     To estimate the genome-wide average heterozygosity for each sample separately and plot the result.
+#   get_heterozygosity: true
+#
+#     To get different estimates of theta (e.g. nucleotide diversity π, Watterson's theta)
+#     as well as neutrality test statistics (e.g. Tajima's D) for each population
+#     (in fixed length windows and as chromosome averages), and plot the result.
+#   get_theta: true
+#
+#     To conduct the local PCA analysis with the lostruct package in R for all samples and plot the result.
+#   run_lostruct_global: true
+#
 
-# Depth cutoffs, in SDs of the fitted depth distribution. This gates every
-# downstream analysis, since the site list is derived from it. Tighten for a
-# repeat-rich genome and check figures/depth/depth_filter.png.
-# get_depth_filter_global:
-#   n_sd: 2
+# ---------------------------------------------------------------------------
+# global:
+# ---------------------------------------------------------------------------
+#     The genotype likelihood model to be used in ANGSD. Enter 1 for the Samtools model and 2 for the GATK model.
+#     See https://www.popgen.dk/angsd/index.php/Genotype_Likelihoods for details.
+#   gl_model: 1
+#
+#     Type of reference genome. Enter 0 if the reference genome is either ancestral or from an outgroup, and 1 if not.
+#     If 0 is entered, loco-pipe will estimates unfolded SFS for certain analytical steps.
+#     If 1 is entered, loco-pipe will estimates folded SFS.
+#   ref_type: 1
+#
 
-# Minor allele frequency floor for SNP calling. 0.05 discards a lot of real
-# rare variation; 0.01-0.02 is common. Does not affect theta or heterozygosity,
-# which run off the depth-filtered site list rather than the SNP list.
-# snp_calling_global:
-#   minmaf: "0.05"
-
-# Raise for a repeat-rich or fragmented reference.
+# ---------------------------------------------------------------------------
 # get_depth_global:
+# ---------------------------------------------------------------------------
+#     The minimum base quality score.
+#     Sequencing data below this threshold will be filtered out and not included in the depth counting.
+#     This same filter is going to be applied to all SNP-based analyses,
+#     but you can choose a different minq filter for genetic diversity estimation.
+#   minq: "20"
+#
+#     The minimum mapping quality score.
+#     A sequencing read that is below this threshold will be filtered out and not included in the depth counting.
+#     This same filter is going to be applied to all SNP-based analyses,
+#     but you can choose a different minq filter for genetic diversity estimation.
+#   minmapq: "20"
+#
+#     The number of threads in the cluster needed for this job.
+#     A thread could be seen as a computing unit. Generally, the more threads you assign,
+#     the faster the job could be done. For this step, the maximum number of threads that
+#     ANGSD can take advantage of is about 8.
+#     This same parameter will be used in all subsequent ANGSD steps, other than ones that involve the realSFS submodule,
+#     which can take advantage of more threads, and you can specify those in the relevant sections below.
+#   threads: 8
+#
+#     Optional arguments to be passed to ANGSD -doDepth.
+#     These arguments could be extra filtering parameters, extra analyses, etc.
+#   extra: ""
+#
+
+# ---------------------------------------------------------------------------
+# get_depth_filter_global:
+# ---------------------------------------------------------------------------
+#     Number of standard deviation the min and max depth filter will be set away from the mean fitted depth.
+#     The larger this number is, the more relaxed the depth filters will be. We recommend you to always check the depth
+#     distribution plot (i.e. angsd/get_depth_global/depth_filter.png) to make sure that the filters make sense. This plot
+#     is generated by the get_depth_filter_global rule, so if you want to change "n_sd"" after seeing the depth distribution
+#     plot, you should first stop the pipeline, change the n_sd value below, delete the plot, and rerun the pipeline.
+#     It is also possible to use your own depth filters by changing the "min_filter" and "max_filter" values manually
+#     in angsd/get_depth_global/depth_filter.tsv
+#   n_sd: 2
+#
+
+# ---------------------------------------------------------------------------
+# snp_calling_global:
+# ---------------------------------------------------------------------------
+#     The minimum PROPORTION of samples that have to have read depth equal to or greater than
+#     the value set by "mindepthind" (see below) for a site to be considered in the analysis.
+#     The sites that have fewer samples passing this threshold will be filtered out.
+#     Note that there is no standarized rule for setting "minind_proportion". The choice depends on the
+#     sequencing depth and its evenness across samples. Since additional depth filteres are
+#     automatically applied in this step, we often choose a relatively relaxed minind filter.
+#     For example, with coverage around 1-2x among samples,
+#     we often use half of the total sample size (i.e. 0.5).
+#   minind_proportion: "0.5"
+#
+#     This filter is used in combination with "minind_proportion" (see above). The default setting is 1,
+#     meaning that a sample needs to have at least 1 read at a site for it to be counted for the "minind" filter.
+#     We suggest that you use stick with the default setting unless there are compelling reasons to use a different value.
+#   mindepthind: "1"
+#
+#     The minimum allele frequency threshold for a site to be considered in the analysis.
+#     The site that has a smaller minor allele frequency that "minmaf" will be filtered out.
+#   minmaf: "0.05"
+#
+#     Threshold for a site to be considered as a SNP based on its p-value.
+#     The site that has a p-value larger than "pval" will be filtered out.
+#   pval: "1e-6"
+#
+#     Optional arguments to be passed to the SNP calling step in ANGSD.
+#     These arguments could add extra input files to analyses (e.g. ancestral genome and individual inbreed coefficients).
+#     They can also be used to specify additional filters or additional analyses.
+#     For example, users can use the "-site" flag here to constrain analysis on a predefined set of SNPs
+#     Or, users can use the "-rmTriallelic" flag followed by a p-value threshold to remove sites with more than two alleles.
+#   extra: ""
+#
+
+# ---------------------------------------------------------------------------
+# subset_snp_list_global:
+# ---------------------------------------------------------------------------
+#     The SNPs subsetting is done by choosing 1 SNP out of every n number of SNPs.
+#     If n = 100, we are picking the first SNP out of every 100 SNPs along the genome.
+#     The larger "n" is, the fewer SNPs are retained in the subsetted list.
+#     Note that since toyfish is already heavily subsetted, we are using a small number here.
+#     You will likely need to enter a much larger number when using a real dataset.
+#   n: 3
+#
+
+# ---------------------------------------------------------------------------
+# subset_snp_list_local:
+# ---------------------------------------------------------------------------
+#     The SNPs subsetting is done by choosing 1 SNP out of every n number of SNPs.
+#     If n = 100, we are picking the first SNP out of the 100 continuous SNPs.
+#     The larger "n" is, the fewer SNPs are retained in the subsetted list.
+#     Note that since toyfish is already heavily subsetted, we are using a small number here.
+#     You will likely need to enter a much larger number when using a real dataset.
+#   n: 3
+#
+
+# ---------------------------------------------------------------------------
+# run_pcangsd_global:
+# ---------------------------------------------------------------------------
+#     Minimum minor allele frequency for a site to be considered in PCA.
+#   minmaf: 0.05
+#
+#     Number of threads PCAngsd uses. This is also passed to the steps where PCAngsd in the used in local PCA
+#   threads: 8
+#
+#     The name of a column in the sample table which you want to color the PCA plot by.
+#     If you do not have a grouping color, use the name of the fake column that you create.
+#   color_by: "population"
+#
+
+# ---------------------------------------------------------------------------
+# run_pcangsd_local:
+# ---------------------------------------------------------------------------
+#     Minimum minor allele frequency for a site to be considered in PCA.
+#   minmaf: 0.05
+#
+#     Number of threads PCAngsd uses.
+#   threads: 8
+#
+#     The name of a column in the sample table which you want to color the PCA plot by.
+#   color_by: "population"
+#
+
+# ---------------------------------------------------------------------------
+# run_ohana_global:
+# ---------------------------------------------------------------------------
+#     The minimum number of K (i.e. the number of ancestral/source population components assumed in the sample).
+#   min_k: 2
+#
+#     The maximum number of K (i.e. the number of ancestral/source population components assumed in the sample).
+#   max_k: 7
+#
+#     The name of a column in the sample table which you want to facet the admixture plot by.
+#     If you do not have a grouping color, use the name of the fake column that you create.
+#   group_by: "population"
+#
+
+# ---------------------------------------------------------------------------
+# run_ohana_local:
+# ---------------------------------------------------------------------------
+#     The minimum number of K (i.e. the number of ancestral/source population components assumed in the sample).
+#   min_k: 2
+#
+#     The maximum number of K (i.e. the number of ancestral/source population components assumed in the sample).
+#   max_k: 4
+#
+#     The name of a column in the sample table which you want to facet the admixture plot by.
+#   group_by: "population"
+#
+
+# ---------------------------------------------------------------------------
+# get_maf:
+# ---------------------------------------------------------------------------
+#     The minimum NUMBER of samples IN A POPULATION that have to have read depth equal to or greater than
+#     the value set by "mindepthind" (see below) for a site to be considered in the analysis.
+#     The sites that have fewer samples passing this threshold will be filtered out.
+#     Note that this is different from the "minind_proportion" filter used in global_snp_calling,
+#     as it specifies a NUMBER of samples instead of a PROPORTION out of the total sample size .
+#     The default setting is 1, meaning that a site only needs to be covered by 1 sample in a population with read depth equal to
+#     or greater than "mindepthind" for it to be considered.
+#   minind: "1"
+#
+#     This filter is used in combination with "minind" (see above). The default setting is 1,
+#     meaning that a sample needs to have at least 1 read at a site for it to be counted for the "minind" filter.
+#     We suggest that you stick with the default setting unless there are compelling reasons to use a different value.
+#   mindepthind: "1"
+#
+#     Optional arguments to be passed to maf estimation per population in ANGSD.
+#     These arguments could add extra input files to analyses (e.g. individual inbreed coefficients).
+#     They can also be used to specify additional filters or additional analyses.
+#   extra: ""
+#
+
+# ---------------------------------------------------------------------------
+# get_fst:
+# ---------------------------------------------------------------------------
+#     The number of threads in the cluster needed for this job.
+#     For this step, the realSFS in ANGSD module is capable of using more than 8 threads.
+#   threads: 8
+#
+#     Optional arguments to be passed to the realSFS module in ANGSD.
+#   extra: ""
+#
+#     The number of SNPs to be included into each fixed-SNP window.
+#   snp_window_size: 100
+#
+#     The number of bases to be included into each fixed-length window.
+#   bp_window_size: 10000
+#
+#     Height of the Manhattan plot, in inches.
+#   fig_height: 3
+#
+#     Width of the Manhattan plot, in inches. You will likely need to enter a much larger number when using a real dataset.
+#   fig_width: 3
+#
+
+# ---------------------------------------------------------------------------
+# get_heterozygosity:
+# ---------------------------------------------------------------------------
+#     The number of threads in the cluster needed for this job.
+#     A thread could be seen as a computing unit. Generally, the more threads you assign,
+#     the faster the job could be done. For this step, the realSFS in ANGSD module is capable of using more than 8 threads.
+#   threads: 8
+#
+#     The minimum base quality score.
+#     Sequencing data below this threshold will be filtered out and not included in the heterozygosity estimation.
+#   minq: "20"
+#
+#     The minimum mapping quality score.
+#     A sequencing read that is below this threshold will be filtered out and not included in the heterozygosity estimation.
+#   minmapq: "20"
+#
+#     Optional arguments to be passed to ANGSD -doSaf.
+#   dosaf_extra: ""
+#
+#     Optional arguments to be passed to ANGSD function realSFS.
+#     The two parameters, -tole and -maxIter, are used to determine when the optimization algorithm stops.
+#     The -tole flag is an shortened for "tolerance for breaking Expectation Maximization".
+#     The -maxIter flag is shortened for "maximum iteration".
+#     Decreasing "-tole" and increasing "-maxIter" will increase computational time but may make the result more accurate.
+#   realsfs_extra: "-tole 1e-08 -maxIter 500"
+#
+#     The name of a column inside the sample table which you want to color the heterozygosity plot by.
+#     If you do not have a grouping color, use the name of the fake column that you create.
+#   color_by: "population"
+#
+
+# ---------------------------------------------------------------------------
+# get_theta:
+# ---------------------------------------------------------------------------
+#     The number of threads in the cluster needed for this job.
+#     A thread could be seen as a computing unit. Generally, the more threads you assign,
+#     the faster the job could be done. For this step, the realSFS in ANGSD module is capable of using more than 8 threads.
+#   threads: 8
+#
+#     The minimum NUMBER of samples IN A POPULATION that have to have read depth equal to or greater than
+#     the value set by "mindepthind" (see below) for a site to be considered in the analysis.
+#     The sites that have fewer samples passing this threshold will be filtered out.
+#     Note that this is different from the "minind_proportion" filter used in global_snp_calling,
+#     as it specifies a NUMBER of samples instead of a PROPORTION out of the total sample size .
+#     The default setting is 1, meaning that a site only needs to be covered by 1 sample in a population with read depth equal to
+#     or greater than "mindepthind" for it to be considered.
+#   minind: "1"
+#
+#     This filter is used in combination with "minind" (see above). The default setting is 1,
+#     meaning that a sample needs to have at least 1 read at a site for it to be counted for the "minind" filter.
+#     We suggest that you use stick with the default setting unless there are compelling reasons to use a different value.
+#   mindepthind: "1"
+#
+#     The minimum base quality score.
+#     Sequencing data below this threshold will be filtered out and not included in the theta estimation.
+#   minq: 20
+#
+#     The minimum mapping quality score.
+#     A sequencing read that is below this threshold will be filtered out and not included in the theta estimation.
 #   minmapq: 20
+#
+#     Window size in base pairs for theta estimation in sliding window.
+#   window_size: 10000
+#
+#     Step size in base pairs for theta estimation in sliding window.
+#     When step size equals window size, the windows are non-overlapping, and there is no gap between them.
+#   step_size: 10000
+#
+#     Optional arguments to be passed to ANGSD -doSaf.
+#   dosaf_extra: ""
+#
+#     Optional arguments to be passed to ANGSD function realSFS.
+#   realsfs_extra: ""
+#
+#     Height of the theta plot, in inches.
+#   fig_height: 5
+#
+#     Width of the theta plot, in inches. You will likely need to enter a much larger number when using a real dataset.
+#   fig_width: 5
+#
+
+# ---------------------------------------------------------------------------
+# lostruct:
+# ---------------------------------------------------------------------------
+#     Number of SNPs in each window.
+#     Note that since toyfish is already heavily subsetted, we are using a small number here.
+#     You will likely need to enter a much larger number when using a real dataset.
+#     The highest number of windows this pipeline can handle is 46340, so it's important to use a SNP window size that
+#     results in fewer (ideally a lot fewer) than 46340 windows in total across the genome.
+#   snp_window_size: 100
+#
+#     Minimum minor allele frequency filter when running the PCA.
+#   minmaf: 0.05
+#
+#     Number of top PCs to retain for each window.
+#   pc: 2
+#
+#     Number of top MDS axes to retain.
+#   k: 6
+#
+#     Number of threads that PCAngsd uses.
+#   threads: 8
+#
+#     z-value cutoff for a window to be considered an outlier.
+#   z_cutoff: 3
+#
+#     Height of the mds figure.
+#   fig_height: 6
+#
+#     Width of the mds figure. You will likely need to enter a much larger number when using a real dataset.
+#   fig_width: 5
+#
+#     The name of a column in the sample table that you want to to color the points by in concensus PCA plots.
+#     If you do not have a grouping color, use the name of the fake column that you create.
+#   color_by: "population"
+#

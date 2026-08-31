@@ -63,6 +63,9 @@ jobs:
           pip install --quiet pyyaml
           python test/check_params_yaml.py
 
+      - name: loco-params.yaml lists every loco-pipe setting
+        run: python test/check_loco_params.py
+
       - name: Retry policy applies to every process
         run: |
           set -euo pipefail
