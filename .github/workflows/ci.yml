@@ -590,6 +590,29 @@ jobs:
                   --outdir params_outdir --locoparams /tmp/bad.yaml --threads 2 --launch false 2>&1) \
             && { echo "expected failure"; exit 1; }
           echo "$out" | grep -q 'do not exist in' || { echo "$out" | tail -20; exit 1; }
+
+          # the likeliest mistake with a commented reference file: uncommenting
+          # a setting but not its section header, which lifts it to the top
+          # level. The error has to name that, not just say "wrong shape".
+          printf 'threads: 24\n' > /tmp/nosection.yaml
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir params_outdir --locoparams /tmp/nosection.yaml --threads 2 --launch false 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q 'section header is probably still commented out' \
+            || { echo "$out" | tail -20; echo "the error does not name the likely fix"; exit 1; }
+          echo "$out" | grep -q "belongs to:" \
+            || { echo "$out" | tail -20; echo "the error does not say which sections have it"; exit 1; }
+
+          # a misspelt section should suggest the near match
+          printf 'ostruct:\n  threads: 24\n' > /tmp/typo.yaml
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir params_outdir --locoparams /tmp/typo.yaml --threads 2 --launch false 2>&1) \
+            && { echo "expected failure"; exit 1; }
+          echo "$out" | grep -q 'did you mean lostruct' \
+            || { echo "$out" | tail -20; echo "no near-match suggestion"; exit 1; }
+
           rm -rf params_outdir
           echo "unknown setting rejected"
 

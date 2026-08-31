@@ -113,6 +113,13 @@ subset_snp_list_local:
 run_pcangsd_global:
   # unquoted here, and must stay untouched when snp_calling_global.minmaf changes
   minmaf: 0.05
+
+get_depth_global:
+  threads: 8
+
+lostruct:
+  # a near-miss target: "ostruct" should be suggested against this
+  threads: 8
 CONFIG
         cat > workflow/config.yaml <<'YAML'
 directory: .

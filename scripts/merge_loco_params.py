@@ -18,18 +18,49 @@ import sys
 import yaml
 
 
-def load_overrides(path):
+def known_settings(config_path):
+    """section -> set(settings), read from the generated config."""
+    try:
+        cfg = yaml.safe_load(open(config_path)) or {}
+    except Exception:
+        return {}
+    return {s: set(v) for s, v in cfg.items() if isinstance(v, dict)}
+
+
+def load_overrides(path, known):
     with open(path) as fh:
         data = yaml.safe_load(fh) or {}
     if not isinstance(data, dict):
         sys.exit(f"{path}: expected a mapping of sections, got {type(data).__name__}")
+
+    # Report everything wrong at once: the file is edited by uncommenting, and
+    # fixing one problem per run is a poor way to spend a cluster.
+    problems = []
     for section, settings in data.items():
-        if not isinstance(settings, dict):
-            sys.exit(
-                f"{path}: '{section}' must be a mapping of settings, got "
-                f"{type(settings).__name__}. Overrides look like:\n"
-                "  subset_snp_list_global:\n    n: 400"
+        if isinstance(settings, dict):
+            continue
+        # By far the likeliest mistake: uncommenting a setting but leaving its
+        # section header commented, which lifts it to the top level.
+        holders = sorted(s for s, keys in known.items() if section in keys)
+        if holders:
+            problems.append(
+                f"  '{section}' is a setting, not a section - its section header is "
+                f"probably still commented out.\n"
+                f"      '{section}' belongs to: {', '.join(holders)}\n"
+                f"      Uncomment the section header as well, so it reads:\n"
+                f"          {holders[0]}:\n            {section}: {settings}"
             )
+        else:
+            problems.append(
+                f"  '{section}' must be a mapping of settings, got "
+                f"{type(settings).__name__}"
+            )
+    if problems:
+        sys.exit(
+            f"{path}:\n" + "\n".join(problems)
+            + "\n\n  An override names a section and then the settings under it:\n"
+              "      subset_snp_list_global:\n        n: 400"
+        )
     return data
 
 
@@ -50,7 +81,8 @@ def main():
         sys.exit(__doc__)
     config_path, overrides_path = sys.argv[1], sys.argv[2]
 
-    overrides = load_overrides(overrides_path)
+    known = known_settings(config_path)
+    overrides = load_overrides(overrides_path, known)
     if not overrides:
         print("no overrides given")
         return 0
@@ -94,7 +126,15 @@ def main():
             del pending[section]
 
     if pending:
-        missing = [f"{s}.{k}" for s, ks in pending.items() for k in ks]
+        missing = []
+        for sec, ks in pending.items():
+            for k in ks:
+                if sec not in known:
+                    near = [s for s in known if sec in s or s in sec]
+                    hint = f"  ( no such section{'; did you mean ' + near[0] + '?' if near else ''} )"
+                    missing.append(f"{sec}.{k}{hint}")
+                else:
+                    missing.append(f"{sec}.{k}  ( no such setting in {sec} )")
         sys.exit(
             "these overrides do not exist in " + config_path + ":\n  "
             + "\n  ".join(missing)
