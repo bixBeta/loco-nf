@@ -255,6 +255,12 @@ jobs:
           # -@ matches what nextflow reserved, not a hardcoded number
           grep -qx -- '2' "$CI_CAPTURE/start.command.txt" || fail "-@ did not match task.cpus"
 
+          # An unset --lococonfig must leave the generated config alone. The
+          # value still writes a newline into the task dir, and [ -s ] calls a
+          # 1 byte file non-empty, so this once wiped locopipe.yaml.
+          grep -q 'basedir' locopipe/locopipe.yaml \
+            || { echo "the generated config was clobbered by an unset --lococonfig"; exit 1; }
+
           # init takes the bam files as SAMPLES; passing anything else ( the
           # reference, say ) is rejected by the real CLI's BAMfile validator.
           # The reference must appear exactly once, as the value of -r; twice

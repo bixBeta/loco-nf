@@ -116,7 +116,9 @@ LOCO_FORCED
     # A complete config supplied with --lococonfig replaces the generated one,
     # then the six run-specific keys are put back. Re-applied every run, so that
     # file stays the source of truth rather than drifting from what ran.
-    if [ -s "\$task_dir/lococonfig.yaml" ] ; then
+    # not [ -s ]: an unset value still writes a newline, and a 1 byte file is
+    # "non-empty" by that test. Ask whether there is any content instead.
+    if grep -q '[^[:space:]]' "\$task_dir/lococonfig.yaml" ; then
         cp "\$task_dir/lococonfig.yaml" locopipe.yaml
         echo "using the config supplied with --lococonfig"
         python3 "\$task_dir/${mergescript}" locopipe.yaml "\$task_dir/forced.yaml"
@@ -127,7 +129,7 @@ LOCO_FORCED
     # Re-applied every run, so that file is the record of what a run used; any
     # setting it does not name keeps whatever is in locopipe.yaml, including
     # hand edits. A setting that does not exist is an error, not a no-op.
-    if [ -s "\$task_dir/overrides.yaml" ] ; then
+    if grep -q '[^[:space:]]' "\$task_dir/overrides.yaml" ; then
         python3 "\$task_dir/${mergescript}" locopipe.yaml "\$task_dir/overrides.yaml"
     fi
 
