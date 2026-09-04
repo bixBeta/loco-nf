@@ -233,6 +233,22 @@ END_VERSIONS
         # ( 46340^2 < 2^31 ). Over that, cmdscale reports only "invalid value of
         # 'n'", which says nothing about windows, config, or what to change -
         # at the end of a run that has already done every other analysis.
+        # A snakemake that was killed rather than allowed to exit leaves its
+        # lock behind, and every later run stops at DAG construction. Not
+        # unlocked automatically: the lock exists precisely to stop two
+        # snakemakes writing the same project, and this cannot tell a stale lock
+        # from a live one. Say what it is and let the operator confirm.
+        if grep -q 'Directory cannot be locked' "\$log" ; then
+            echo >&2
+            echo "  A previous run left its lock behind ( killed, or the machine" >&2
+            echo "  went down ). Check that nothing is still running:" >&2
+            echo "      ps -u \\\$USER -o pid,cmd | grep -E 'snakemake|nextflow'" >&2
+            echo "  and if that is empty, remove the lock and resume:" >&2
+            echo "      rm -rf ${outdir}/.snakemake/locks" >&2
+            echo "  Results and resume state are elsewhere and are not affected." >&2
+            echo >&2
+        fi
+
         # Windows left by a previous, finer window size. The rule clears its own
         # outputs with `rm -f <dir>/<chr>.*`, which exceeds ARG_MAX once there
         # are tens of thousands of them, so it dies at its first line having run

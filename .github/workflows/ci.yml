@@ -738,6 +738,25 @@ jobs:
           rm -rf win_outdir
           echo "window clearing OK"
 
+      # A killed run leaves snakemake's lock behind and every later run stops at
+      # DAG construction. The message says --unlock, which is not reachable
+      # through the loco-pipe CLI, so the front-end has to say what to do.
+      - name: A leftover lock says how to clear it
+        run: |
+          set -euo pipefail
+          rm -rf lock_outdir
+          export FAKE_LOCKED=1
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir lock_outdir --threads 2 2>&1) \
+            && { echo "a locked directory was reported as success"; exit 1; }
+          echo "$out" | grep -q 'left its lock behind' \
+            || { echo "$out" | tail -20; echo "the lock was not explained"; exit 1; }
+          echo "$out" | grep -q 'lock_outdir/.snakemake/locks' \
+            || { echo "$out" | tail -20; echo "the lock path was not named"; exit 1; }
+          rm -rf lock_outdir
+          echo "lock explained OK"
+
       # lostruct dies with "invalid value of 'n'" once a genome yields more than
       # 46340 windows, at the end of a run that has already done everything
       # else. The message names neither windows nor any setting, so the failure

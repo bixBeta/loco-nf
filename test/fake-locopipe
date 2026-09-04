@@ -205,6 +205,16 @@ YAML
             exit 0
         fi
 
+        # A lock left by a run that was killed. Stops at DAG construction, so
+        # nothing at all is produced - and still exits 0.
+        if [ "${FAKE_LOCKED:-0}" = "1" ] ; then
+            echo "Building DAG of jobs..."
+            echo "LockException:"
+            echo "Error: Directory cannot be locked. Please make sure that no other Snakemake process is trying to create the same files in the following directory:"
+            echo "${DIR}"
+            exit 0
+        fi
+
         # Windows of a previous size that the rule's own `rm -f <dir>/<chr>.*`
         # cannot clear. Fails before running anything, and like every loco-pipe
         # failure still exits 0.
