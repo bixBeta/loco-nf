@@ -723,6 +723,18 @@ jobs:
           test -e "$O/run_pcangsd_in_windows/chr_big.w001.cov" \
             || { echo "an unchanged window size threw away completed windows"; exit 1; }
 
+          # The run that changes the size is the one that fails on the stale
+          # windows, and by the next run the merge reports "already" - so the
+          # change is no longer visible and the failure itself has to clear.
+          mkdir -p "$O/run_pcangsd_in_windows"
+          touch "$O/run_pcangsd_in_windows/chr_big.w002.cov"
+          FAKE_ARGMAX=1 nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir win_outdir --locoparams /tmp/win300.yaml --threads 2 > /dev/null 2>&1 \
+            && { echo "the stale-window failure was reported as success"; exit 1; }
+          test ! -e "$O/run_pcangsd_in_windows/chr_big.w002.cov" \
+            || { echo "the failure did not clear the stale windows"; exit 1; }
+
           rm -rf win_outdir
           echo "window clearing OK"
 

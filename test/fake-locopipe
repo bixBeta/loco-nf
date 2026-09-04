@@ -205,6 +205,17 @@ YAML
             exit 0
         fi
 
+        # Windows of a previous size that the rule's own `rm -f <dir>/<chr>.*`
+        # cannot clear. Fails before running anything, and like every loco-pipe
+        # failure still exits 0.
+        if [ "${FAKE_ARGMAX:-0}" = "1" ] ; then
+            echo "/usr/bin/bash: line 3: /usr/bin/rm: Argument list too long"
+            echo "Error in rule run_pcangsd_in_windows_global:"
+            echo "WorkflowError:"
+            echo "At least one job did not complete successfully."
+            exit 0
+        fi
+
         # The lostruct window ceiling, reproduced because the message R gives
         # for it says nothing about windows and it lands at the end of a run
         # that has already done every other analysis. Exits 0 like any other

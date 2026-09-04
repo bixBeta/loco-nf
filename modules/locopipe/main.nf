@@ -233,6 +233,23 @@ END_VERSIONS
         # ( 46340^2 < 2^31 ). Over that, cmdscale reports only "invalid value of
         # 'n'", which says nothing about windows, config, or what to change -
         # at the end of a run that has already done every other analysis.
+        # Windows left by a previous, finer window size. The rule clears its own
+        # outputs with `rm -f <dir>/<chr>.*`, which exceeds ARG_MAX once there
+        # are tens of thousands of them, so it dies at its first line having run
+        # nothing. Clearing on the change alone is not enough: the run that
+        # changed the setting is the one that fails, and by the next run the
+        # merge reports "already", so nothing looks changed any more. Clear them
+        # here too, where a directory goes by name, and let the retry rebuild.
+        if grep -q 'Argument list too long' "\$log" ; then
+            rm -rf lostruct/global/split_beagle lostruct/global/run_pcangsd_in_windows
+            echo >&2
+            echo "  The lostruct window directories held more files than the rule's" >&2
+            echo "  own cleanup can hand to rm - windows of a previous window size." >&2
+            echo "  They have been cleared; the retry rebuilds them at the current" >&2
+            echo "  size." >&2
+            echo >&2
+        fi
+
         if grep -q "invalid value of 'n'" "\$log" ; then
             wins=\$(cat lostruct/global/summarize_pcangsd_for_lostruct/*.pca_summary.tsv 2>/dev/null | wc -l | tr -d ' ')
             echo >&2
