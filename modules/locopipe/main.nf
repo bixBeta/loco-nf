@@ -130,7 +130,27 @@ LOCO_FORCED
     # setting it does not name keeps whatever is in locopipe.yaml, including
     # hand edits. A setting that does not exist is an error, not a no-op.
     if grep -q '[^[:space:]]' "\$task_dir/overrides.yaml" ; then
-        python3 "\$task_dir/${mergescript}" locopipe.yaml "\$task_dir/overrides.yaml"
+        # not piped into tee: a pipeline reports the exit status of its LAST
+        # command, so tee would mask the merge rejecting a bad override and the
+        # run would carry on unconfigured.
+        python3 "\$task_dir/${mergescript}" locopipe.yaml "\$task_dir/overrides.yaml" \\
+            > "\$task_dir/merge.log" 2>&1 || { cat "\$task_dir/merge.log" >&2 ; exit 1 ; }
+        cat "\$task_dir/merge.log"
+    fi
+
+    # Changing lostruct.snp_window_size re-windows the genome, and the windows
+    # of the old size are still sitting in the output directories. That alone
+    # would be harmless, except the rules clear their previous outputs with
+    #   rm -f <dir>/<chr>.*
+    # which passes one argument per file. A fine window size on a real genome
+    # leaves tens of thousands of them per chromosome, so the glob exceeds
+    # ARG_MAX and the rule dies at its first line with
+    #   /usr/bin/rm: Argument list too long
+    # before it can run anything. Clear them here, where a directory can be
+    # removed by name instead.
+    if grep -q '^ *lostruct\\.snp_window_size: .* -> ' "\$task_dir/merge.log" 2>/dev/null ; then
+        rm -rf lostruct/global/split_beagle lostruct/global/run_pcangsd_in_windows
+        echo "lostruct.snp_window_size changed: cleared the windows of the previous size"
     fi
 
     # The generated profile carries rerun-triggers: [mtime, params], so merely

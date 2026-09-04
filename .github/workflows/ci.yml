@@ -678,6 +678,51 @@ jobs:
             && { echo "a failed loco-pipe run was reported as success"; exit 1; }
           echo "failure detection OK"
 
+      # Re-windowing leaves the old windows behind, and the rules clear their
+      # own outputs with a glob that then exceeds ARG_MAX - so the rule dies at
+      # its first line before running anything. The windows must be cleared
+      # when the size changes, and only then.
+      - name: Changing the lostruct window size clears the old windows
+        run: |
+          set -euo pipefail
+          rm -rf win_outdir
+          O=win_outdir/lostruct/global
+
+          printf 'lostruct:\n  snp_window_size: 200\n' > /tmp/win200.yaml
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir win_outdir --locoparams /tmp/win200.yaml --threads 2 2>&1)
+          echo "$out" | grep -q 'cleared the windows of the previous size' \
+            || { echo "$out" | tail -20; echo "a changed window size did not clear"; exit 1; }
+
+          # stand in for the previous size's output, which on a real genome is
+          # the tens of thousands of files that break the rule's own rm
+          mkdir -p "$O/split_beagle" "$O/run_pcangsd_in_windows"
+          touch "$O/split_beagle/chr_big.w000.beagle.gz" \
+                "$O/run_pcangsd_in_windows/chr_big.w000.cov"
+
+          printf 'lostruct:\n  snp_window_size: 300\n' > /tmp/win300.yaml
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir win_outdir --locoparams /tmp/win300.yaml --threads 2 > /dev/null 2>&1
+          test ! -e "$O/run_pcangsd_in_windows/chr_big.w000.cov" \
+            || { echo "the previous size's windows survived"; exit 1; }
+          test ! -e "$O/split_beagle/chr_big.w000.beagle.gz" \
+            || { echo "the previous size's beagle windows survived"; exit 1; }
+
+          # and the negative case: an unchanged size must NOT throw work away,
+          # or every resume would redo the most expensive part of lostruct
+          mkdir -p "$O/run_pcangsd_in_windows"
+          touch "$O/run_pcangsd_in_windows/chr_big.w001.cov"
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir win_outdir --locoparams /tmp/win300.yaml --threads 2 > /dev/null 2>&1
+          test -e "$O/run_pcangsd_in_windows/chr_big.w001.cov" \
+            || { echo "an unchanged window size threw away completed windows"; exit 1; }
+
+          rm -rf win_outdir
+          echo "window clearing OK"
+
       # lostruct dies with "invalid value of 'n'" once a genome yields more than
       # 46340 windows, at the end of a run that has already done everything
       # else. The message names neither windows nor any setting, so the failure
