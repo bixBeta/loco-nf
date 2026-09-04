@@ -207,6 +207,31 @@ END_VERSIONS
     # signal, and without this a failed run looks like a successful one.
     if grep -qE 'WorkflowError|command exited with non-zero|MissingInputException|Error in rule|^Error' "\$log" ; then
         echo "loco-pipe reported a failure, see pipeline_info/locopipe.log" >&2
+
+        # lostruct builds a full window x window distance matrix, and R indexes
+        # a matrix with a signed 32 bit int, so it cannot exceed 46340 windows
+        # ( 46340^2 < 2^31 ). Over that, cmdscale reports only "invalid value of
+        # 'n'", which says nothing about windows, config, or what to change -
+        # at the end of a run that has already done every other analysis.
+        if grep -q "invalid value of 'n'" "\$log" ; then
+            wins=\$(cat lostruct/global/summarize_pcangsd_for_lostruct/*.pca_summary.tsv 2>/dev/null | wc -l | tr -d ' ')
+            echo >&2
+            echo "  This is the lostruct window ceiling, not a configuration error." >&2
+            echo "  lostruct compares every window against every other one, and R" >&2
+            echo "  cannot index a matrix larger than 46340 x 46340." >&2
+            if [ "\${wins:-0}" -gt 0 ] ; then
+                echo "  This run produced \$wins windows." >&2
+                echo "  Raise lostruct.snp_window_size ( currently splitting at" >&2
+                echo "  \$(sed -n '/^lostruct:/,/^[a-z]/p' locopipe.yaml | sed -n 's/^ *snp_window_size: *//p' | head -1) SNPs per window ) by at least" >&2
+                echo "  \$(( (wins / 20000) + 1 ))x and resume." >&2
+            else
+                echo "  Raise lostruct.snp_window_size in your --locoparams file and resume." >&2
+            fi
+            echo "  Everything else this run computed is kept; only the lostruct" >&2
+            echo "  branch is redone." >&2
+            echo >&2
+        fi
+
         tail -40 "\$log" >&2
         exit 1
     fi

@@ -678,6 +678,28 @@ jobs:
             && { echo "a failed loco-pipe run was reported as success"; exit 1; }
           echo "failure detection OK"
 
+      # lostruct dies with "invalid value of 'n'" once a genome yields more than
+      # 46340 windows, at the end of a run that has already done everything
+      # else. The message names neither windows nor any setting, so the failure
+      # has to be translated into the thing to change.
+      - name: The lostruct window ceiling explains itself
+        run: |
+          set -euo pipefail
+          rm -rf locopipe
+          export FAKE_LOSTRUCT=1
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --threads 2 2>&1) \
+            && { echo "the lostruct failure was reported as success"; exit 1; }
+          echo "$out" | grep -q 'lostruct window ceiling' \
+            || { echo "$out" | tail -30; echo "the failure was not explained"; exit 1; }
+          # the count it actually produced, and a factor to raise the setting by
+          echo "$out" | grep -q '50000 windows' \
+            || { echo "$out" | tail -30; echo "the window count was not reported"; exit 1; }
+          echo "$out" | grep -q 'snp_window_size' \
+            || { echo "$out" | tail -30; echo "the setting to change was not named"; exit 1; }
+          echo "lostruct ceiling explained OK"
+
       # snakemake writes a source cache under $HOME/.cache and dies at DAG
       # construction if $HOME is read-only, which it is inside a container on
       # many clusters. The run must not depend on a writable home.

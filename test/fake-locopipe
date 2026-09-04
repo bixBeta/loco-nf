@@ -123,6 +123,7 @@ get_depth_global:
 lostruct:
   # a near-miss target: "ostruct" should be suggested against this
   threads: 8
+  snp_window_size: 100
 CONFIG
         cat > workflow/config.yaml <<'YAML'
 directory: .
@@ -201,6 +202,20 @@ YAML
             echo "Job stats:"
             echo "total    104"
             echo "This was a dry-run (flag -n)."
+            exit 0
+        fi
+
+        # The lostruct window ceiling, reproduced because the message R gives
+        # for it says nothing about windows and it lands at the end of a run
+        # that has already done every other analysis. Exits 0 like any other
+        # loco-pipe failure.
+        if [ "${FAKE_LOSTRUCT:-0}" = "1" ] ; then
+            mkdir -p "${DIR}/lostruct/global/summarize_pcangsd_for_lostruct"
+            seq 50000 > "${DIR}/lostruct/global/summarize_pcangsd_for_lostruct/chr_big.pca_summary.tsv"
+            echo "Error in cmdscale(as.dist(dist), k = k, eig = T) : invalid value of 'n'"
+            echo "Execution halted"
+            echo "WorkflowError:"
+            echo "At least one job did not complete successfully."
             exit 0
         fi
 
