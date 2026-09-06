@@ -752,7 +752,9 @@ jobs:
             && { echo "the buried failure was reported as success"; exit 1; }
           echo "$out" | grep -q 'THE_REAL_PROBLEM_IS_HERE' \
             || { echo "$out" | tail -20; echo "the error was buried by later output"; exit 1; }
-          echo "$out" | grep -q 'Error in rule plot_lostruct_mds_global' \
+          # nextflow shows only the last ~20 lines of a failed task's stderr, so
+          # the name has to be at the very end to survive
+          echo "$out" | grep -q 'rule(s) that failed: plot_lostruct_mds_global' \
             || { echo "$out" | tail -20; echo "the failing rule was not named"; exit 1; }
           rm -rf buried_outdir
           echo "buried failure surfaced OK"

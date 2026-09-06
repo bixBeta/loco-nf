@@ -228,11 +228,24 @@ END_VERSIONS
     if grep -qE 'WorkflowError|command exited with non-zero|MissingInputException|Error in rule|^Error' "\$log" ; then
         echo "loco-pipe reported a failure, see pipeline_info/locopipe.log" >&2
 
-        # lostruct builds a full window x window distance matrix, and R indexes
-        # a matrix with a signed 32 bit int, so it cannot exceed 46340 windows
-        # ( 46340^2 < 2^31 ). Over that, cmdscale reports only "invalid value of
-        # 'n'", which says nothing about windows, config, or what to change -
-        # at the end of a run that has already done every other analysis.
+        # Everything below is ordered so the most useful line is the LAST one.
+        # Nextflow shows only the final ~20 lines of a failed task's stderr, so
+        # anything printed early is cut off in the report the operator actually
+        # reads - which is how the excerpt below lost the line naming the rule
+        # when it was printed first.
+
+        # A plain tail is misleading on a chatty rule: pcangsd prints a line per
+        # iteration and the outlier step runs it once per MDS axis, so by the
+        # end of the log the failure is hundreds of lines up and the last 40 are
+        # some other job's successful output. Show the blocks snakemake wrote
+        # about the failure itself, and fall back to the tail only if it wrote
+        # none ( a failure before the DAG, say ).
+        if grep -qE 'Error in rule|RuleException' "\$log" ; then
+            grep -E -A 12 'Error in rule|RuleException' "\$log" | tail -40 >&2
+        else
+            tail -30 "\$log" >&2
+        fi
+
         # A snakemake that was killed rather than allowed to exit leaves its
         # lock behind, and every later run stops at DAG construction. Not
         # unlocked automatically: the lock exists precisely to stop two
@@ -285,16 +298,13 @@ END_VERSIONS
             echo >&2
         fi
 
-        # A plain tail is misleading on a chatty rule: pcangsd prints a line per
-        # iteration and the outlier step runs it once per MDS axis, so by the
-        # end of the log the failure is hundreds of lines up and the last 40 are
-        # some other job's successful output. Show the blocks snakemake wrote
-        # about the failure itself, and fall back to the tail only if it wrote
-        # none ( a failure before the DAG, say ).
-        if grep -qE 'Error in rule|RuleException' "\$log" ; then
-            grep -E -A 20 'Error in rule|RuleException' "\$log" | tail -60 >&2
-        else
-            tail -40 "\$log" >&2
+        # Last, so it survives the truncation: which rule actually failed, which
+        # is the one thing needed to find the rest in the full log.
+        failed=\$(grep -oE 'Error in rule [A-Za-z_0-9]+' "\$log" | sed 's/Error in rule //' | sort -u | tr '\\n' ' ')
+        if [ -n "\$failed" ] ; then
+            echo >&2
+            echo "  rule(s) that failed: \$failed" >&2
+            echo "  each rule's own log is under ${outdir}/, named after it" >&2
         fi
         exit 1
     fi
