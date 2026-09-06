@@ -205,6 +205,24 @@ YAML
             exit 0
         fi
 
+        # A failure buried under a chatty rule's successful output, which is
+        # what the outlier PCA looks like: pcangsd prints a line per iteration,
+        # once per MDS axis, long after the job that actually failed.
+        if [ "${FAKE_BURIED:-0}" = "1" ] ; then
+            echo "Error in rule plot_lostruct_mds_global:"
+            echo "    jobid: 1431"
+            echo "    THE_REAL_PROBLEM_IS_HERE"
+            i=0
+            while [ $i -lt 200 ] ; do
+                echo "Individual allele frequencies estimated ($i).	RMSE=0.0000100"
+                i=$(( i + 1 ))
+            done
+            echo "PCAngsd converged."
+            echo "WorkflowError:"
+            echo "At least one job did not complete successfully."
+            exit 0
+        fi
+
         # A lock left by a run that was killed. Stops at DAG construction, so
         # nothing at all is produced - and still exits 0.
         if [ "${FAKE_LOCKED:-0}" = "1" ] ; then

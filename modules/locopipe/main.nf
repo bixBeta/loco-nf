@@ -285,7 +285,17 @@ END_VERSIONS
             echo >&2
         fi
 
-        tail -40 "\$log" >&2
+        # A plain tail is misleading on a chatty rule: pcangsd prints a line per
+        # iteration and the outlier step runs it once per MDS axis, so by the
+        # end of the log the failure is hundreds of lines up and the last 40 are
+        # some other job's successful output. Show the blocks snakemake wrote
+        # about the failure itself, and fall back to the tail only if it wrote
+        # none ( a failure before the DAG, say ).
+        if grep -qE 'Error in rule|RuleException' "\$log" ; then
+            grep -E -A 20 'Error in rule|RuleException' "\$log" | tail -60 >&2
+        else
+            tail -40 "\$log" >&2
+        fi
         exit 1
     fi
 

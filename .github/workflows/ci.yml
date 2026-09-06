@@ -738,6 +738,25 @@ jobs:
           rm -rf win_outdir
           echo "window clearing OK"
 
+      # The failing rule is often not the last thing in the log: the outlier PCA
+      # prints a line per pcangsd iteration, once per MDS axis, so a tail shows
+      # another job's successful output and the operator is told nothing.
+      - name: A failure buried under later output is still reported
+        run: |
+          set -euo pipefail
+          rm -rf buried_outdir
+          export FAKE_BURIED=1
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir buried_outdir --threads 2 2>&1) \
+            && { echo "the buried failure was reported as success"; exit 1; }
+          echo "$out" | grep -q 'THE_REAL_PROBLEM_IS_HERE' \
+            || { echo "$out" | tail -20; echo "the error was buried by later output"; exit 1; }
+          echo "$out" | grep -q 'Error in rule plot_lostruct_mds_global' \
+            || { echo "$out" | tail -20; echo "the failing rule was not named"; exit 1; }
+          rm -rf buried_outdir
+          echo "buried failure surfaced OK"
+
       # A killed run leaves snakemake's lock behind and every later run stops at
       # DAG construction. The message says --unlock, which is not reachable
       # through the loco-pipe CLI, so the front-end has to say what to do.
