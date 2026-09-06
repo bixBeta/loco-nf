@@ -81,7 +81,7 @@ jobs:
           # default engine is singularity: the container directive must point at
           # a local .sif, and nothing may reference a registry
           cfg=$(nextflow config .)
-          echo "$cfg" | grep -q 'file:///workdir/TREx_shared/projects/loco-pipe.sif' || {
+          grep -q 'file:///workdir/TREx_shared/projects/loco-pipe.sif' <<< "$cfg" || {
             echo "$cfg" | grep -i container; echo "sif path not resolved"; exit 1; }
           # The analysis image must be local. The report image is deliberately a
           # registry reference: quarto lives in the sartools image, not in
@@ -126,8 +126,8 @@ jobs:
           covered "$PWD/test/bams" || { echo "bam directory not reachable"; exit 1; }
           covered "$PWD/test/ref"  || { echo "reference directory not reachable"; exit 1; }
           # the site defaults must survive
-          echo "$binds" | grep -q -- '-B /local'   || { echo "/local bind lost"; exit 1; }
-          echo "$binds" | grep -q -- '-B /workdir' || { echo "/workdir bind lost"; exit 1; }
+          grep -q -- '-B /local' <<< "$binds"   || { echo "/local bind lost"; exit 1; }
+          grep -q -- '-B /workdir' <<< "$binds" || { echo "/workdir bind lost"; exit 1; }
           echo "binds OK"
 
       - name: A missing sheet does not break config parsing
@@ -157,8 +157,8 @@ jobs:
           rc=$?
           set -e
           if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
-          echo "$out" | grep -q 'chr_big'        || { echo "$out" | tail -20; exit 1; }
-          echo "$out" | grep -q 'below --minlen' || { echo "$out" | tail -20; echo "minlen not reported"; exit 1; }
+          grep -q 'chr_big' <<< "$out"        || { echo "$out" | tail -20; exit 1; }
+          grep -q 'below --minlen' <<< "$out" || { echo "$out" | tail -20; echo "minlen not reported"; exit 1; }
 
       # Non blocking: reports what the v2 strict parser makes of the pipeline,
       # so the gap is visible before it becomes mandatory.
@@ -187,8 +187,8 @@ jobs:
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
                   --ref "$PWD/test/ref/noindex.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'No fasta index at' || { echo "$out" | tail -20; exit 1; }
-          echo "$out" | grep -q 'samtools faidx'    || { echo "$out" | tail -20; echo "no fix suggested"; exit 1; }
+          grep -q 'No fasta index at' <<< "$out" || { echo "$out" | tail -20; exit 1; }
+          grep -q 'samtools faidx' <<< "$out"    || { echo "$out" | tail -20; echo "no fix suggested"; exit 1; }
 
       - name: A duplicated sample name is rejected
         run: |
@@ -196,7 +196,7 @@ jobs:
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-dup.csv \
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q "appears more than once" || { echo "$out" | tail -20; exit 1; }
+          grep -q "appears more than once" <<< "$out" || { echo "$out" | tail -20; exit 1; }
 
       - name: A missing bam is named
         run: |
@@ -204,7 +204,7 @@ jobs:
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-missingbam.csv \
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'S1: no bam at' || { echo "$out" | tail -20; exit 1; }
+          grep -q 'S1: no bam at' <<< "$out" || { echo "$out" | tail -20; exit 1; }
 
       # 'label' is what the other bixBeta pipelines call this column, so a sheet
       # written for those must work here too.
@@ -252,7 +252,7 @@ jobs:
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet-nogroup.csv \
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q "missing required column 'group'" || { echo "$out" | tail -20; exit 1; }
+          grep -q "missing required column 'group'" <<< "$out" || { echo "$out" | tail -20; exit 1; }
 
       - name: A missing image is reported with the resolved path
         run: |
@@ -260,8 +260,8 @@ jobs:
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
                   --ref "$PWD/test/ref/ref.fa" --sifdir "$PWD/nosuchdir" 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'No loco-pipe image at' || { echo "$out" | tail -20; exit 1; }
-          echo "$out" | grep -q 'build-sif.sh'          || { echo "$out" | tail -20; echo "no fix suggested"; exit 1; }
+          grep -q 'No loco-pipe image at' <<< "$out" || { echo "$out" | tail -20; exit 1; }
+          grep -q 'build-sif.sh' <<< "$out"          || { echo "$out" | tail -20; echo "no fix suggested"; exit 1; }
 
       # ---- the real thing, against the fake CLI ------------------------------
 
@@ -405,8 +405,8 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --minlen 99999999 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'nothing to analyse' || { echo "$out" | tail -20; exit 1; }
-          echo "$out" | grep -q 'longest is 2000000' || { echo "$out" | tail -20; echo "longest not reported"; exit 1; }
+          grep -q 'nothing to analyse' <<< "$out" || { echo "$out" | tail -20; exit 1; }
+          grep -q 'longest is 2000000' <<< "$out" || { echo "$out" | tail -20; echo "longest not reported"; exit 1; }
 
       - name: A single group warns but still runs
         run: |
@@ -418,7 +418,7 @@ jobs:
           rc=$?
           set -e
           if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
-          echo "$out" | grep -q "every sample is in group" || { echo "$out" | tail -20; exit 1; }
+          grep -q "every sample is in group" <<< "$out" || { echo "$out" | tail -20; exit 1; }
 
       - name: --launch false stops after preparing
         run: |
@@ -431,7 +431,7 @@ jobs:
           rc=$?
           set -e
           if [ $rc -ne 0 ] ; then echo "$out" | tail -40 ; exit 1 ; fi
-          echo "$out" | grep -q 'without launching it' || { echo "$out" | tail -20; exit 1; }
+          grep -q 'without launching it' <<< "$out" || { echo "$out" | tail -20; exit 1; }
           # the tables are written, so the grouping can be checked ...
           test -f locopipe/docs/samples.tsv || { echo "no samples.tsv"; exit 1; }
           test -f locopipe/locopipe.yaml    || { echo "no locopipe.yaml"; exit 1; }
@@ -492,14 +492,14 @@ jobs:
           # next assertion needs.
           run -resume > /dev/null
           out=$(run -resume)
-          echo "$out" | grep -qi 'cached' \
+          grep -qi 'cached' <<< "$out" \
             || { echo "$out" | tail -20; echo "an unchanged -resume did not reuse the task"; exit 1; }
 
           # Now edit the settings. Every analysis threshold lives in that file
           # and nextflow cannot otherwise see it, so this must NOT be cached.
           echo "# EDITED_AGAIN" >> reuse_outdir/locopipe.yaml
           out=$(run -resume)
-          if echo "$out" | grep -qi 'cached' ; then
+          if grep -qi 'cached' <<< "$out" ; then
             echo "$out" | tail -20
             echo "an edited locopipe.yaml was ignored by -resume"; exit 1
           fi
@@ -589,7 +589,7 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --outdir params_outdir --locoparams /tmp/bad.yaml --threads 2 --launch false 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'do not exist in' || { echo "$out" | tail -20; exit 1; }
+          grep -q 'do not exist in' <<< "$out" || { echo "$out" | tail -20; exit 1; }
 
           # the likeliest mistake with a commented reference file: uncommenting
           # a setting but not its section header, which lifts it to the top
@@ -599,9 +599,9 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --outdir params_outdir --locoparams /tmp/nosection.yaml --threads 2 --launch false 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'section header is probably still commented out' \
+          grep -q 'section header is probably still commented out' <<< "$out" \
             || { echo "$out" | tail -20; echo "the error does not name the likely fix"; exit 1; }
-          echo "$out" | grep -q "belongs to:" \
+          grep -q "belongs to:" <<< "$out" \
             || { echo "$out" | tail -20; echo "the error does not say which sections have it"; exit 1; }
 
           # The same mistake one section further in: the uncommented setting is
@@ -613,10 +613,10 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --outdir params_outdir --locoparams /tmp/bledin.yaml --threads 2 --launch false 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'section header is probably still commented out' \
+          grep -q 'section header is probably still commented out' <<< "$out" \
             || { echo "$out" | tail -20; echo "the error does not name the likely fix"; exit 1; }
           # the section it was meant for is the next one down that has it
-          echo "$out" | grep -q 'run_pcangsd_global:' \
+          grep -q 'run_pcangsd_global:' <<< "$out" \
             || { echo "$out" | tail -20; echo "the error does not guess the right section"; exit 1; }
 
           # a misspelt section should suggest the near match
@@ -625,7 +625,7 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --outdir params_outdir --locoparams /tmp/typo.yaml --threads 2 --launch false 2>&1) \
             && { echo "expected failure"; exit 1; }
-          echo "$out" | grep -q 'did you mean lostruct' \
+          grep -q 'did you mean lostruct' <<< "$out" \
             || { echo "$out" | tail -20; echo "no near-match suggestion"; exit 1; }
 
           rm -rf params_outdir
@@ -641,7 +641,7 @@ jobs:
           out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --outdir dry_outdir --threads 2 --id DRYTEST --dryrun true 2>&1)
-          echo "$out" | grep -q 'DRY RUN' || { echo "$out" | tail -30; echo "no dry run notice"; exit 1; }
+          grep -q 'DRY RUN' <<< "$out" || { echo "$out" | tail -30; echo "no dry run notice"; exit 1; }
           # the project is laid out and the tables written ...
           test -f dry_outdir/docs/samples.tsv || { echo "tables not written"; exit 1; }
           test -f dry_outdir/locopipe.yaml    || { echo "config not written"; exit 1; }
@@ -750,11 +750,11 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --outdir buried_outdir --threads 2 2>&1) \
             && { echo "the buried failure was reported as success"; exit 1; }
-          echo "$out" | grep -q 'THE_REAL_PROBLEM_IS_HERE' \
+          grep -q 'THE_REAL_PROBLEM_IS_HERE' <<< "$out" \
             || { echo "$out" | tail -20; echo "the error was buried by later output"; exit 1; }
           # nextflow shows only the last ~20 lines of a failed task's stderr, so
           # the name has to be at the very end to survive
-          echo "$out" | grep -q 'rule(s) that failed: plot_lostruct_mds_global' \
+          grep -q 'rule(s) that failed: plot_lostruct_mds_global' <<< "$out" \
             || { echo "$out" | tail -20; echo "the failing rule was not named"; exit 1; }
           rm -rf buried_outdir
           echo "buried failure surfaced OK"
@@ -771,9 +771,9 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --outdir lock_outdir --threads 2 2>&1) \
             && { echo "a locked directory was reported as success"; exit 1; }
-          echo "$out" | grep -q 'left its lock behind' \
+          grep -q 'left its lock behind' <<< "$out" \
             || { echo "$out" | tail -20; echo "the lock was not explained"; exit 1; }
-          echo "$out" | grep -q 'lock_outdir/.snakemake/locks' \
+          grep -q 'lock_outdir/.snakemake/locks' <<< "$out" \
             || { echo "$out" | tail -20; echo "the lock path was not named"; exit 1; }
           rm -rf lock_outdir
           echo "lock explained OK"
@@ -791,12 +791,12 @@ jobs:
                   --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
                   --threads 2 2>&1) \
             && { echo "the lostruct failure was reported as success"; exit 1; }
-          echo "$out" | grep -q 'lostruct window ceiling' \
+          grep -q 'lostruct window ceiling' <<< "$out" \
             || { echo "$out" | tail -30; echo "the failure was not explained"; exit 1; }
           # the count it actually produced, and a factor to raise the setting by
-          echo "$out" | grep -q '50000 windows' \
+          grep -q '50000 windows' <<< "$out" \
             || { echo "$out" | tail -30; echo "the window count was not reported"; exit 1; }
-          echo "$out" | grep -q 'snp_window_size' \
+          grep -q 'snp_window_size' <<< "$out" \
             || { echo "$out" | tail -30; echo "the setting to change was not named"; exit 1; }
           echo "lostruct ceiling explained OK"
 
