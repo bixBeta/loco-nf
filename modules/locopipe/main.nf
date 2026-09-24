@@ -358,5 +358,6 @@ END_VERSIONS
     touch ${outdir}/locopipe.yaml
     touch versions.yml
     echo "stub" > locopipe.log
+    touch report.manifest
     """
 }
