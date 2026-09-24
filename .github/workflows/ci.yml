@@ -926,6 +926,11 @@ jobs:
                    $FIX/figures/lostruct/global
           png() { convert -size 40x30 xc:white "$1" ; }
           png $FIX/figures/depth/depth_filter.png
+          # the timings the Run statistics section plots
+          printf 'rule\tjobs\twall_seconds\tlongest_seconds\tshare_percent\n' \
+            > $FIX/docs/rule_times.tsv
+          printf 'get_heterozygosity\t46\t22622\t578\t56.10\n' >> $FIX/docs/rule_times.tsv
+          printf 'get_depth_global\t24\t9501\t519\t43.90\n'    >> $FIX/docs/rule_times.tsv
           png $FIX/figures/heterozygosity/heterozygosity.png
           png $FIX/figures/pcangsd/global/combined.subsetted.png
           png $FIX/figures/pcangsd/local/alpha.combined.subsetted.png
@@ -986,6 +991,9 @@ jobs:
           mkdir -p /tmp/render && cd /tmp/render
           bash /tmp/render.sh
           test -f CI_TEST-loco-report.html || { echo "no report produced"; exit 1; }
+          # the timings chart, written standalone so it can be shared without
+          # sending the whole report
+          test -s run_stats.png || { echo "no standalone run_stats.png"; exit 1; }
           # lostruct's separated.pca is the one figure loco-pipe emits as a PDF,
           # so the report depends on this conversion. It used to fail silently
           # and show up as "this module was not run".
@@ -1013,6 +1021,8 @@ jobs:
           # module that was switched off is distinguishable from output that
           # landed somewhere unexpected
           grep -q 'Not produced' "$H" || { echo "missing-module note absent"; exit 1; }
+          grep -q 'Run statistics' "$H" || { echo "no run statistics section"; exit 1; }
+          grep -q 'get_heterozygosity' "$H" || { echo "timings table not rendered"; exit 1; }
           grep -qE 'Not produced: (no [a-z]+ found|`[^`]+` is missing)' "$H" \
             || { echo "the missing-output note does not say what is missing"; exit 1; }
           # sizing is decided per image: landscape figures constrained by width,

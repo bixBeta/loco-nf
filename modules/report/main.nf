@@ -11,6 +11,9 @@ process REPORT {
     label 'qmds'
 
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "*.html"
+    // named exactly, not *.png: the task directory is full of the figures
+    // copied out of the outdir for rendering, and none of those belong here
+    publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "run_stats.png"
 
     input:
         val  id
@@ -20,6 +23,7 @@ process REPORT {
 
     output:
         path "*.html", emit: report
+        path "run_stats.png", emit: stats, optional: true
 
     // The qmd is a staged path input rather than a ${projectDir} reference:
     // Nextflow binds the directories of declared inputs, but not the pipeline

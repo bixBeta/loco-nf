@@ -427,10 +427,7 @@ if (file.exists("docs/rule_times.tsv")) {
   rt <- tryCatch(read.delim("docs/rule_times.tsv"), error = function(e) NULL)
 }
 
-if (is.null(rt) || !nrow(rt)) {
-  cat("*Not produced: `docs/rule_times.tsv` is missing. It is written from",
-      "snakemake's log at the end of a run.*")
-} else {
+draw_rule_times <- function(rt) {
   top <- head(rt[order(-rt$wall_seconds), ], 12)
   top <- top[order(top$wall_seconds), ]          # barplot draws bottom-up
   hours <- top$wall_seconds / 3600
@@ -443,6 +440,21 @@ if (is.null(rt) || !nrow(rt)) {
   text(hours, mids, labels = sprintf(" %.1f%%", top$share_percent),
        pos = 4, cex = 0.8, xpd = NA)
   par(op)
+}
+
+if (is.null(rt) || !nrow(rt)) {
+  cat("*Not produced: `docs/rule_times.tsv` is missing. It is written from",
+      "snakemake's log at the end of a run.*")
+} else {
+  draw_rule_times(rt)
+
+  # The same chart as a standalone file, for sharing without the report.
+  # Written beside the html in pipeline_info rather than into figures/, which
+  # feeds the report's own fingerprint - a report writing there would make its
+  # output decide whether it needs rewriting.
+  png("run_stats.png", width = 1000, height = 560)
+  draw_rule_times(rt)
+  invisible(dev.off())
 }
 ```
 
