@@ -459,8 +459,12 @@ workflow RUN {
     // than on the outdir existing.
     if( params.launch && params.report && !params.dryrun ) {
 
-        REPORT( ch_pin, LOCOPIPE.out.versions.map { outdir },
-                file("${projectDir}/qmds/loco-report.qmd") )
+        // the manifest, not versions.yml: it both sequences REPORT after
+        // LOCOPIPE and changes when the figures do, which is what makes a
+        // cached report correct rather than merely fast
+        REPORT( ch_pin, LOCOPIPE.out.manifest.map { outdir },
+                file("${projectDir}/qmds/loco-report.qmd"),
+                LOCOPIPE.out.manifest )
     }
 
     if( !params.launch ) {

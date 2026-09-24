@@ -16,6 +16,7 @@ process REPORT {
         val  id
         val  outdir
         path qmd
+        path manifest   // only to make new figures invalidate the cached report
 
     output:
         path "*.html", emit: report

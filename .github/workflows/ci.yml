@@ -759,6 +759,39 @@ jobs:
           rm -rf buried_outdir
           echo "buried failure surfaced OK"
 
+      # New figures must invalidate the cached report. REPORT's other inputs -
+      # the id, the outdir as a string, the qmd - are identical run to run, so
+      # without a fingerprint of the figures nextflow serves a stale HTML while
+      # new plots sit on disk unmentioned. That is what happened on a real run.
+      - name: New figures re-render the report
+        run: |
+          set -euo pipefail
+          rm -rf cache_outdir
+          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+            --outdir cache_outdir --id CACHETEST --report true --threads 2 > /dev/null 2>&1
+          test -f pipeline_info/CACHETEST-loco-report.html || { echo "no report"; exit 1; }
+          before=$(md5sum pipeline_info/CACHETEST-loco-report.html | cut -d' ' -f1)
+
+          # nothing changed: the report must be served from cache, or every
+          # resume would re-render for no reason
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir cache_outdir --id CACHETEST --report true --threads 2 -resume 2>&1)
+          grep -q 'Cached process.*REPORT' <<< "$out" \
+            || { echo "$out" | tail -20; echo "an unchanged run re-rendered"; exit 1; }
+
+          # a new figure must NOT be served from cache
+          echo "new plot" > cache_outdir/figures/brand_new.png
+          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+                  --outdir cache_outdir --id CACHETEST --report true --threads 2 -resume 2>&1)
+          if grep -q 'Cached process.*REPORT' <<< "$out" ; then
+            echo "$out" | tail -20; echo "a new figure was served a stale report"; exit 1
+          fi
+          rm -rf cache_outdir
+          echo "report cache invalidation OK"
+
       # A killed run leaves snakemake's lock behind and every later run stops at
       # DAG construction. The message says --unlock, which is not reachable
       # through the loco-pipe CLI, so the front-end has to say what to do.

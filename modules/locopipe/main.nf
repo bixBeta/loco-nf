@@ -63,6 +63,7 @@ process LOCOPIPE {
         path "versions.yml"  , emit: versions
         path "locopipe.log"  , emit: log, optional: true
         path "rule_times.txt", emit: times, optional: true
+        path "report.manifest", emit: manifest
 
     script:
     """
@@ -70,6 +71,11 @@ process LOCOPIPE {
     ${TASK_HOME}
 
     task_dir=\$PWD
+
+    # Declared as a non-optional output, and there are paths out of this script
+    # that never reach the run ( --launch false, --dryrun ). Create it empty now
+    # so those exit cleanly; the real fingerprint overwrites it after the run.
+    : > "\$task_dir/report.manifest"
 
     cat > "\$task_dir/overrides.yaml" <<'LOCO_OVERRIDES'
 ${overrides}
@@ -319,6 +325,19 @@ END_VERSIONS
 
         exit 1
     fi
+
+    # What the report renders, fingerprinted. REPORT is a separate task, and
+    # its other inputs - the id, the outdir as a STRING, the qmd - are identical
+    # from one run to the next, so nextflow saw no change and served a cached
+    # HTML while new figures sat on disk unmentioned. outdir cannot be a path
+    # input ( loco-pipe owns that directory and works in it in place ), so hand
+    # REPORT a summary of its contents instead: sizes and names, not mtimes, so
+    # a rerun that reproduces identical figures still hits the cache.
+    {
+        find figures -type f -printf '%s\t%P\n' 2>/dev/null \
+            || find figures -type f 2>/dev/null
+        cat docs/rule_times.tsv 2>/dev/null
+    } | sort > "\$task_dir/report.manifest" || : > "\$task_dir/report.manifest"
 
     # A run that does nothing at all is a failure too: snakemake can exit
     # cleanly with an empty DAG, and loco-pipe start returns 0 either way, so
