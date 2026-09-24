@@ -42,6 +42,7 @@ process LOCOPIPE {
     // moving them out of the directory snakemake tracks would break its resume.
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "versions.yml"
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "locopipe.log"
+    publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "rule_times.txt"
 
     input:
         val   pin
@@ -56,10 +57,12 @@ process LOCOPIPE {
         path  ref
         path  fai
         path  mergescript
+        path  timescript
 
     output:
         path "versions.yml"  , emit: versions
         path "locopipe.log"  , emit: log, optional: true
+        path "rule_times.txt", emit: times, optional: true
 
     script:
     """
@@ -221,6 +224,14 @@ END_VERSIONS
     fi
 
     loco-pipe start -@ ${task.cpus} . 2>&1 | tee "\$log"
+
+    # What each rule cost, recovered from snakemake's own log. Written every
+    # run, before the error guard, so a run that failed half way still says
+    # where its time went. Never fatal: this is a report, not a result.
+    # docs/ is what the report stages, so the tsv goes there; the text table is
+    # published beside the log, for reading in a terminal.
+    python3 "\$task_dir/${timescript}" --tsv docs/rule_times.tsv .snakemake/log/*.snakemake.log \
+        > "\$task_dir/rule_times.txt" 2>/dev/null || rm -f "\$task_dir/rule_times.txt"
 
     # `loco-pipe start` calls subprocess.run without checking the return code,
     # so it exits 0 even when the workflow failed. Its log is the only reliable

@@ -452,7 +452,8 @@ workflow RUN {
               channel.value(outdir), channel.value(settings), channel.value(overrides),
               channel.value(lococonfig),
               file(params.ref), file("${params.ref}.fai"),
-              file("${projectDir}/scripts/merge_loco_params.py") )
+              file("${projectDir}/scripts/merge_loco_params.py"),
+              file("${projectDir}/scripts/rule_times.py") )
 
     // The report reads the finished results, so it waits on LOCOPIPE rather
     // than on the outdir existing.

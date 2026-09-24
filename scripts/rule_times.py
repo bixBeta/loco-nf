@@ -75,16 +75,39 @@ def hms(seconds):
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+
+    # --tsv also writes the same numbers machine readably, which is what the
+    # report plots. Kept as a side output rather than the only one: the text
+    # table is what you want when reading it in a terminal mid-run.
+    tsv = None
+    if "--tsv" in args:
+        i = args.index("--tsv")
+        try:
+            tsv = args[i + 1]
+        except IndexError:
+            sys.exit("--tsv needs a path")
+        args = args[:i] + args[i + 2:]
+
+    if not args:
         sys.exit(__doc__)
 
-    durations, unfinished = parse(sys.argv[1:])
+    durations, unfinished = parse(args)
     if not durations:
         sys.exit("no completed jobs found - are these snakemake logs?")
 
     rows = sorted(durations.items(), key=lambda kv: sum(kv[1]), reverse=True)
     width = max(len(r) for r, _ in rows)
     total = sum(sum(v) for v in durations.values())
+
+    if tsv:
+        with open(tsv, "w") as fh:
+            fh.write("rule\tjobs\twall_seconds\tlongest_seconds\tshare_percent\n")
+            for rule, secs in rows:
+                fh.write(
+                    f"{rule}\t{len(secs)}\t{sum(secs):.0f}\t{max(secs):.0f}\t"
+                    f"{100 * sum(secs) / total:.2f}\n"
+                )
 
     print(f"{'rule':<{width}}  {'jobs':>5}  {'wall':>10}  {'longest':>10}  {'share':>6}")
     print("-" * (width + 38))

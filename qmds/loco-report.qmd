@@ -409,6 +409,70 @@ results.
 
 </details>
 
+## Run statistics
+
+Where the compute went, recovered from snakemake's own log. **Wall** is the sum
+of every job's duration for that rule, so with jobs running concurrently it
+exceeds the elapsed time of the run — read it as how much work a rule cost, not
+how long you waited. **Longest** is the slowest single job, which is what bounds
+the run when that rule is the last thing left.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#| fig-width: 9
+#| fig-height: 5
+# Drawn with base graphics on purpose: the report renders in the sartools
+# image, and ggplot2 being present there is not something this should depend on.
+rt <- NULL
+if (file.exists("docs/rule_times.tsv")) {
+  rt <- tryCatch(read.delim("docs/rule_times.tsv"), error = function(e) NULL)
+}
+
+if (is.null(rt) || !nrow(rt)) {
+  cat("*Not produced: `docs/rule_times.tsv` is missing. It is written from",
+      "snakemake's log at the end of a run.*")
+} else {
+  top <- head(rt[order(-rt$wall_seconds), ], 12)
+  top <- top[order(top$wall_seconds), ]          # barplot draws bottom-up
+  hours <- top$wall_seconds / 3600
+
+  op <- par(mar = c(4.5, 16, 1, 4))
+  mids <- barplot(hours, horiz = TRUE, names.arg = top$rule, las = 1,
+                  col = "#c44900", border = NA, cex.names = 0.85,
+                  xlab = "wall time (hours, summed across jobs)",
+                  xlim = c(0, max(hours) * 1.15))
+  text(hours, mids, labels = sprintf(" %.1f%%", top$share_percent),
+       pos = 4, cex = 0.8, xpd = NA)
+  par(op)
+}
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if (!is.null(rt) && nrow(rt)) {
+  hms <- function(s) sprintf("%d:%02d:%02d", s %/% 3600, (s %% 3600) %/% 60, s %% 60)
+  tab <- data.frame(
+    rule     = rt$rule,
+    jobs     = rt$jobs,
+    wall     = hms(rt$wall_seconds),
+    per_job  = hms(round(rt$wall_seconds / rt$jobs)),
+    longest  = hms(rt$longest_seconds),
+    share    = sprintf("%.1f%%", rt$share_percent)
+  )
+  datatable(tab, rownames = FALSE,
+            options = list(dom = "t", pageLength = 50, scrollX = TRUE))
+}
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
+# per_job against longest says whether the work is evenly spread: a rule whose
+# slowest job is far above its average is bounded by that one job, and adding
+# cores will not help it.
+if (!is.null(rt) && nrow(rt)) {
+  total <- sum(rt$wall_seconds)
+  cat(sprintf("\nTotal: **%.1f hours** of compute across **%d jobs**.\n",
+              total / 3600, sum(rt$jobs)))
+}
+```
+
 ## Software versions
 
 <details>
