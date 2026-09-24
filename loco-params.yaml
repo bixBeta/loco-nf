@@ -34,6 +34,16 @@
 # ---------------------------------------------------------------------------
 # to_include:
 # ---------------------------------------------------------------------------
+#     Which analyses to run. EVERY ONE OF THESE DEFAULTS TO true, so leaving a
+#     line commented runs that module - it is not "off by omission". To switch
+#     one off you must uncomment it, with the section header, set to false:
+#
+#         to_include:
+#           get_heterozygosity: false
+#
+#     Worth getting right before a long run: on 46 samples across 24
+#     chromosomes, get_heterozygosity alone was 56% of the total compute.
+#
 #     To call SNPs with all samples.
 #   snp_calling_global: true
 #
