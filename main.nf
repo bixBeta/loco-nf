@@ -459,12 +459,13 @@ workflow RUN {
     // than on the outdir existing.
     if( params.launch && params.report && !params.dryrun ) {
 
-        // the manifest, not versions.yml: it both sequences REPORT after
-        // LOCOPIPE and changes when the figures do, which is what makes a
-        // cached report correct rather than merely fast
-        REPORT( ch_pin, LOCOPIPE.out.manifest.map { outdir },
+        // The manifest's CONTENT, not the file: it sequences REPORT after
+        // LOCOPIPE and changes when the figures do. Passed as a val because a
+        // path input is hashed by name/size/mtime, so an identical manifest
+        // written by a re-run would still read as changed.
+        REPORT( ch_pin, outdir,
                 file("${projectDir}/qmds/loco-report.qmd"),
-                LOCOPIPE.out.manifest )
+                LOCOPIPE.out.manifest.map { it.text } )
     }
 
     if( !params.launch ) {

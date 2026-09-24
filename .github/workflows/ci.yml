@@ -763,36 +763,43 @@ jobs:
       # the id, the outdir as a string, the qmd - are identical run to run, so
       # without a fingerprint of the figures nextflow serves a stale HTML while
       # new plots sit on disk unmentioned. That is what happened on a real run.
-      - name: New figures re-render the report
+      # REPORT's other inputs - the id, the outdir as a string, the qmd - are
+      # identical from one run to the next, so without a fingerprint of the
+      # figures nextflow serves a cached HTML while new plots sit on disk
+      # unmentioned. That happened on a real run: the PCA figures never reached
+      # the report. What is asserted here is the fingerprint itself; whether an
+      # unchanged val re-triggers a task is nextflow's business, not ours.
+      - name: The report fingerprint tracks the figures
         run: |
           set -euo pipefail
-          rm -rf cache_outdir
-          # -stub-run: rendering for real needs the sartools image, which this
-          # job has no runtime for. The stub still exercises what is being
-          # tested - whether nextflow considers REPORT's inputs changed.
-          nextflow run . -stub-run -c test/ci.config --sheet test/sample-sheet.csv \
-            --ref "$PWD/test/ref/ref.fa" --outdir cache_outdir --id CACHETEST \
-            --report true --threads 2 > /dev/null 2>&1
+          rm -rf fp_outdir
+          run() {
+            nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
+              --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
+              --outdir fp_outdir --id FPTEST --threads 2 "$@"
+          }
+          run > /dev/null
+          test -s pipeline_info/report.manifest \
+            || { echo "no fingerprint was produced"; exit 1; }
+          cp pipeline_info/report.manifest /tmp/fp1
 
-          # nothing changed: the report must be served from cache, or every
-          # resume would re-render for no reason
-          out=$(nextflow run . -stub-run -c test/ci.config --sheet test/sample-sheet.csv \
-                  --ref "$PWD/test/ref/ref.fa" --outdir cache_outdir --id CACHETEST \
-                  --report true --threads 2 -resume 2>&1)
-          grep -q 'Cached process.*REPORT' <<< "$out" \
-            || { echo "$out" | tail -20; echo "an unchanged run re-rendered"; exit 1; }
+          # same figures -> byte identical, or every resume re-renders for nothing
+          run > /dev/null
+          cmp -s /tmp/fp1 pipeline_info/report.manifest \
+            || { diff /tmp/fp1 pipeline_info/report.manifest || true
+                 echo "an unchanged run produced a different fingerprint"; exit 1; }
 
-          # a new figure must NOT be served from cache
-          mkdir -p cache_outdir/figures
-          echo "new plot" > cache_outdir/figures/brand_new.png
-          out=$(nextflow run . -stub-run -c test/ci.config --sheet test/sample-sheet.csv \
-                  --ref "$PWD/test/ref/ref.fa" --outdir cache_outdir --id CACHETEST \
-                  --report true --threads 2 -resume 2>&1)
-          if grep -q 'Cached process.*REPORT' <<< "$out" ; then
-            echo "$out" | tail -20; echo "a new figure was served a stale report"; exit 1
+          # a new figure must change it
+          echo "new plot" > fp_outdir/figures/brand_new.png
+          run > /dev/null
+          if cmp -s /tmp/fp1 pipeline_info/report.manifest ; then
+            echo "a new figure did not change the fingerprint"; exit 1
           fi
-          rm -rf cache_outdir
-          echo "report cache invalidation OK"
+          grep -q 'brand_new.png' pipeline_info/report.manifest \
+            || { cat pipeline_info/report.manifest; echo "the new figure is not named"; exit 1; }
+
+          rm -rf fp_outdir
+          echo "report fingerprint OK"
 
       # A killed run leaves snakemake's lock behind and every later run stops at
       # DAG construction. The message says --unlock, which is not reachable

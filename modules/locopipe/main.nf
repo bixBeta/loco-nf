@@ -43,6 +43,7 @@ process LOCOPIPE {
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "versions.yml"
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "locopipe.log"
     publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "rule_times.txt"
+    publishDir "pipeline_info", mode: "copy", overwrite: true, pattern: "report.manifest"
 
     input:
         val   pin
