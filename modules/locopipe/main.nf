@@ -358,6 +358,11 @@ END_VERSIONS
     touch ${outdir}/locopipe.yaml
     touch versions.yml
     echo "stub" > locopipe.log
-    touch report.manifest
+    # Computed for real, not touched: this output exists to decide whether the
+    # report is still valid, so a stub that always emitted the same empty file
+    # would make -stub-run unable to test caching at all.
+    { find ${outdir}/figures -type f -printf '%s\\t%P\\n' 2>/dev/null \\
+        || find ${outdir}/figures -type f 2>/dev/null ; } \\
+        | sort > report.manifest || : > report.manifest
     """
 }

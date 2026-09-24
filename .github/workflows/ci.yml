@@ -767,25 +767,27 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf cache_outdir
-          nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
-            --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
-            --outdir cache_outdir --id CACHETEST --report true --threads 2 > /dev/null 2>&1
-          test -f pipeline_info/CACHETEST-loco-report.html || { echo "no report"; exit 1; }
-          before=$(md5sum pipeline_info/CACHETEST-loco-report.html | cut -d' ' -f1)
+          # -stub-run: rendering for real needs the sartools image, which this
+          # job has no runtime for. The stub still exercises what is being
+          # tested - whether nextflow considers REPORT's inputs changed.
+          nextflow run . -stub-run -c test/ci.config --sheet test/sample-sheet.csv \
+            --ref "$PWD/test/ref/ref.fa" --outdir cache_outdir --id CACHETEST \
+            --report true --threads 2 > /dev/null 2>&1
 
           # nothing changed: the report must be served from cache, or every
           # resume would re-render for no reason
-          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
-                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
-                  --outdir cache_outdir --id CACHETEST --report true --threads 2 -resume 2>&1)
+          out=$(nextflow run . -stub-run -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --outdir cache_outdir --id CACHETEST \
+                  --report true --threads 2 -resume 2>&1)
           grep -q 'Cached process.*REPORT' <<< "$out" \
             || { echo "$out" | tail -20; echo "an unchanged run re-rendered"; exit 1; }
 
           # a new figure must NOT be served from cache
+          mkdir -p cache_outdir/figures
           echo "new plot" > cache_outdir/figures/brand_new.png
-          out=$(nextflow run . -c test/ci.config --sheet test/sample-sheet.csv \
-                  --ref "$PWD/test/ref/ref.fa" --locopipebin "$PWD/test/bin/loco-pipe" \
-                  --outdir cache_outdir --id CACHETEST --report true --threads 2 -resume 2>&1)
+          out=$(nextflow run . -stub-run -c test/ci.config --sheet test/sample-sheet.csv \
+                  --ref "$PWD/test/ref/ref.fa" --outdir cache_outdir --id CACHETEST \
+                  --report true --threads 2 -resume 2>&1)
           if grep -q 'Cached process.*REPORT' <<< "$out" ; then
             echo "$out" | tail -20; echo "a new figure was served a stale report"; exit 1
           fi
