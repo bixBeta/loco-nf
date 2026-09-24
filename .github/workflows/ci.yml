@@ -790,6 +790,7 @@ jobs:
                  echo "an unchanged run produced a different fingerprint"; exit 1; }
 
           # a new figure must change it
+          mkdir -p fp_outdir/figures
           echo "new plot" > fp_outdir/figures/brand_new.png
           run > /dev/null
           if cmp -s /tmp/fp1 pipeline_info/report.manifest ; then

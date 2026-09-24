@@ -258,7 +258,10 @@ YAML
             exit 0
         fi
 
-        mkdir -p "${DIR}/figures"
+        mkdir -p "${DIR}/figures/depth"
+        # a real run leaves figures behind, and the report's fingerprint is
+        # taken over them; a bare empty directory made that untestable
+        printf 'not really a png\n' > "${DIR}/figures/depth/depth_filter.png"
 
         # the upstream quirk: a failed workflow still exits 0
         if [ "${FAKE_FAIL:-0}" = "1" ] ; then
