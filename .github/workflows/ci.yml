@@ -931,6 +931,11 @@ jobs:
             > $FIX/docs/rule_times.tsv
           printf 'get_heterozygosity\t46\t22622\t578\t56.10\n' >> $FIX/docs/rule_times.tsv
           printf 'get_depth_global\t24\t9501\t519\t43.90\n'    >> $FIX/docs/rule_times.tsv
+          # the thinning level must reach the settings table: PCA and admixture
+          # run on the subsetted beagle, and a reader cannot judge those figures
+          # without knowing how many markers went in
+          printf 'subset_snp_list_global:\n  n: 3000\nsubset_snp_list_local:\n  n: 3000\n' \
+            >> $FIX/locopipe.yaml
           png $FIX/figures/heterozygosity/heterozygosity.png
           png $FIX/figures/pcangsd/global/combined.subsetted.png
           png $FIX/figures/pcangsd/local/alpha.combined.subsetted.png
@@ -1022,6 +1027,8 @@ jobs:
           # landed somewhere unexpected
           grep -q 'Not produced' "$H" || { echo "missing-module note absent"; exit 1; }
           grep -q 'Run statistics' "$H" || { echo "no run statistics section"; exit 1; }
+          grep -q 'subset_snp_list_global' "$H" \
+            || { echo "the thinning level is not reported"; exit 1; }
           grep -q 'get_heterozygosity' "$H" || { echo "timings table not rendered"; exit 1; }
           grep -qE 'Not produced: (no [a-z]+ found|`[^`]+` is missing)' "$H" \
             || { echo "the missing-output note does not say what is missing"; exit 1; }

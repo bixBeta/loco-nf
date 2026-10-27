@@ -248,6 +248,12 @@ settings <- function(cfg) {
     c("get_depth_global", "minmapq",             "minimum mapping quality"),
     c("get_maf", "minind",                       "minimum individuals for allele frequencies"),
     c("run_pcangsd_global", "minmaf",            "minor allele frequency cutoff for PCA"),
+    # The thinning level belongs here: PCA and admixture run on the SUBSETTED
+    # beagle, never the full SNP list, so this is the marker set those figures
+    # were built from. Omitting it had a reader ask whether thinning was used
+    # at all, which the report should answer on its own.
+    c("subset_snp_list_global", "n",             "PCA / admixture use 1 SNP in every n (all samples)"),
+    c("subset_snp_list_local", "n",              "within-population PCA / admixture use 1 SNP in every n"),
     c("get_fst", "snp_window_size",              "Fst window, in SNPs"),
     c("get_fst", "bp_window_size",               "Fst window, in bp"),
     c("get_theta", "window_size",                "theta window, in bp"),
